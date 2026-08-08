@@ -1,0 +1,13 @@
+# AgentDesk 一键部署：docker compose up --build -d
+# 密钥从宿主机环境变量读取（或本目录 .env，compose 会自动加载）
+services:
+  agentdesk:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

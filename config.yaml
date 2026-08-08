@@ -1,0 +1,44 @@
+# ============ AgentDesk 集中配置 ============
+# 说明：
+# 1. 所有密钥一律放在项目根 .env 中（复制 .env.example 并填写），本文件不存密钥。
+# 2. 修改后重启服务生效；护栏参数用于控制成本与风险。
+
+model:
+  base_url: "https://api.deepseek.com"   # OpenAI 兼容 API 地址
+  chat_model: "deepseek-chat"            # 对话模型（可换 deepseek-reasoner 等）
+  temperature: 0.2
+  max_tokens: 4096
+
+agent:
+  max_steps: 20            # 单任务最大工具调用步数（护栏）
+  max_cost_yuan: 2.0       # 单任务最大成本（护栏，元）
+  max_repeated_actions: 3  # 相同动作连续重复次数上限（护栏）
+  max_tool_output_chars: 4000  # 单次工具结果回填给模型的最大字符数
+
+workspace:
+  root: "data/workspace"   # 默认工作目录（相对项目根；所有文件操作被锁定在此目录内）
+
+tools:
+  code_runner:
+    timeout_seconds: 60       # Python 脚本执行超时（护栏）
+    max_output_chars: 8000    # 脚本输出截断长度
+  web_research:
+    request_timeout_seconds: 15
+    max_pages_per_task: 10    # 单任务最多抓取页数（护栏）
+    max_chars_per_page: 6000  # 单页正文截断长度
+
+search:
+  provider: "tavily"         # tavily | fallback（无 key 时自动回退 fallback）
+  tavily:
+    max_results: 8
+  fallback:
+    engine: "duckduckgo"     # duckduckgo | bing（免 key 网页解析，稳定性较弱）
+    max_results: 8
+
+storage:
+  db_path: "data/db/agentdesk.db"   # SQLite（会话/消息/任务/工具调用记录）
+  backups_dir: "data/backups"       # 覆盖/删除前自动备份区（可一键撤销）
+
+ui:
+  host: "127.0.0.1"
+  port: 8000

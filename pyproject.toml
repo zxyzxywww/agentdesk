@@ -1,0 +1,61 @@
+[project]
+name = "agentdesk"
+version = "0.1.0"
+description = "AgentDesk - 通用任务型 Agent：自然语言下达任务，自动规划并调用工具完成文件/数据处理与网页调研"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.60",
+    "pydantic>=2.8",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "httpx>=0.27",
+    "beautifulsoup4>=4.12",
+    "markdown>=3.6",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.10",
+    "pygments>=2.17",
+    "pytest>=8.0",
+    "pytest-mock>=3.14",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+    "types-PyYAML>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentdesk"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+    "integration: 需要真实 API key 的集成测试(默认跳过)",
+    "llm: 需要真实 LLM API 的测试(默认跳过)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = ["src"]
+explicit_package_bases = true
+files = ["src"]
+ignore_missing_imports = true
+warn_unused_ignores = true

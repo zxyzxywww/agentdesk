@@ -1,0 +1,29 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+
+# ---- 测试与质量 ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ---- 密钥 ----
+.env
+
+# ---- 运行产物(可重建) ----
+data/workspace/*
+!data/workspace/.gitkeep
+data/db/
+
+# ---- 前端依赖(如 npm 安装) ----
+node_modules/
+
+# ---- 系统 ----
+.DS_Store
+Thumbs.db
