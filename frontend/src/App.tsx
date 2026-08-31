@@ -84,12 +84,42 @@ export default function App() {
     return list;
   }, []);
 
+  // ---- 面板恢复：从已完成的任务结果填充 执行/计划/验收 ----
+  const restorePanel = useCallback(async (taskId: string) => {
+    try {
+      const r = await api.tasks.result(taskId);
+      setAccept(r);
+      setPlan(r.plan ?? []);
+      setToolCards(
+        (r.tool_calls ?? []).map((c, i) => ({
+          seq: i + 1,
+          name: c.name,
+          status: (
+            c.status === "success" ? "success" : c.status === "failed" ? "failed" : "waiting_confirm"
+          ) as ToolCardData["status"],
+          args: c.arguments,
+          summary:
+            typeof c.result?.path === "string"
+              ? `产出: ${c.result.path}`
+              : undefined,
+          files:
+            typeof c.result?.path === "string" ? [c.result.path as string] : undefined,
+          duration: c.duration_s,
+        }))
+      );
+    } catch {
+      /* 忽略 */
+    }
+  }, []);
+
   // ---- 会话切换 ----
   const selectSession = useCallback(
-    async (id: string) => {
-      setCurrentSession(sessions.find((s) => s.id === id) ?? null);
+    async (session: Session) => {
+      const id = session.id;
+      setCurrentSession(session);
       setTaskId(null);
       setRunning(false);
+      setPending(null);
       setToolCards([]);
       setPlan([]);
       setAccept(null);
@@ -99,7 +129,7 @@ export default function App() {
         setMessages([]);
       }
       await Promise.all([loadFiles(), loadBackups(), loadCost(id)]);
-      // 恢复挂起中的确认（刷新后仍可操作）
+      // 恢复挂起确认，或最近已完成任务的面板状态（刷新/切换不丢历史）
       try {
         const tasks = await api.sessions.tasks(id);
         const hanging = tasks.find((t) => t.status === "waiting_confirm");
@@ -107,12 +137,17 @@ export default function App() {
           setTaskId(hanging.id);
           const p = await api.tasks.pending(hanging.id);
           if (p) setPending(p);
+        } else {
+          const lastDone = [...tasks]
+            .reverse()
+            .find((t) => ["done", "stopped", "failed"].includes(t.status));
+          if (lastDone) await restorePanel(lastDone.id);
         }
       } catch {
         /* 忽略 */
       }
     },
-    [sessions, loadFiles, loadBackups, loadCost]
+    [loadFiles, loadBackups, loadCost, restorePanel]
   );
 
   // ---- 任务结束后的验收刷新 ----
@@ -301,7 +336,7 @@ export default function App() {
       try {
         setStatus(await api.status());
         const list = await loadSessions();
-        if (list.length) await selectSession(list[0].id);
+        if (list.length) await selectSession(list[0]);
       } catch (e) {
         toast.error("后端初始化失败：" + (e as Error).message);
       }
@@ -317,14 +352,25 @@ export default function App() {
           currentId={currentSession?.id ?? null}
           onSelect={selectSession}
           onCreate={async () => {
-            await api.sessions.create();
-            const list = await loadSessions();
-            if (list.length) await selectSession(list[0].id);
+            const s = await api.sessions.create();
+            await loadSessions();
+            await selectSession(s);
           }}
           onDelete={async (id) => {
             await api.sessions.remove(id);
             if (currentSession?.id === id) setCurrentSession(null);
             await loadSessions();
+          }}
+          onRename={async (id, title) => {
+            try {
+              await api.sessions.rename(id, title);
+              await loadSessions();
+              setCurrentSession((prev) =>
+                prev && prev.id === id ? { ...prev, title } : prev
+              );
+            } catch (e) {
+              toast.error("重命名失败：" + (e as Error).message);
+            }
           }}
           onExport={exportReport}
         />

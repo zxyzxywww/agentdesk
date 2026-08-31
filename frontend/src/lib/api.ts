@@ -32,6 +32,12 @@ export const api = {
       }),
     remove: (id: string) =>
       request<{ ok: boolean }>(`/api/sessions/${id}`, { method: "DELETE" }),
+    rename: (id: string, title: string) =>
+      request<Session>(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: jsonHeaders,
+        body: JSON.stringify({ title }),
+      }),
     messages: (id: string) => request<Message[]>(`/api/sessions/${id}/messages`),
     tasks: (id: string) => request<TaskRecord[]>(`/api/sessions/${id}/tasks`),
     exportMarkdown: async (id: string) => {

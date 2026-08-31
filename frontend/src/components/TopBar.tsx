@@ -46,8 +46,9 @@ export function TopBar({
       </div>
 
       <div className="ml-2 hidden items-center gap-1.5 lg:flex">
-        <Badge variant="secondary" className="gap-1 font-normal">
+        <Badge variant="secondary" className="gap-1 font-normal" title="当前网页搜索使用的服务">
           <Search className="size-3" />
+          <span className="text-muted-foreground">搜索</span>
           {status?.search_provider ?? "…"}
         </Badge>
         <Badge variant="secondary" className="max-w-[260px] gap-1 truncate font-normal" title={status?.workspace}>

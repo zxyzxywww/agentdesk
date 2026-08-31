@@ -235,6 +235,15 @@ def test_websocket_ping_pong(client: TestClient) -> None:
         assert ws.receive_json()["type"] == "pong"
 
 
+def test_rename_session(client: TestClient) -> None:
+    sid = client.post("/api/sessions", json={"title": "旧名"}).json()["id"]
+    r = client.patch(f"/api/sessions/{sid}", json={"title": "新名字"})
+    assert r.status_code == 200
+    assert r.json()["title"] == "新名字"
+    assert client.get("/api/sessions").json()[0]["title"] == "新名字"
+    assert client.patch("/api/sessions/nope", json={"title": "x"}).status_code == 404
+
+
 def test_restart_marks_interrupted_tasks_failed(tmp_path: Path) -> None:
     """服务重启后（runner 内存丢失），running/waiting_confirm 任务应被标记失败，
     避免前端恢复出无法确认的挂起弹窗。"""

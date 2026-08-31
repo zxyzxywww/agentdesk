@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Zap } from "lucide-react";
 import { motion } from "motion/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/lib/types";
 import { EmptyState } from "./EmptyState";
@@ -14,16 +16,17 @@ function Bubble({ message }: { message: Message }) {
       transition={{ duration: 0.18 }}
       className={cn("flex", isUser ? "justify-end" : "justify-start")}
     >
-      <div
-        className={cn(
-          "max-w-[78%] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
-          isUser
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md border bg-card text-foreground"
-        )}
-      >
-        {message.content}
-      </div>
+      {isUser ? (
+        <div className="max-w-[78%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">
+          {message.content}
+        </div>
+      ) : (
+        <div className="max-w-[78%] rounded-2xl rounded-bl-md border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
+          <div className="msg-md">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

@@ -39,6 +39,10 @@ class CreateSession(BaseModel):
     title: str = "新会话"
 
 
+class RenameSession(BaseModel):
+    title: str
+
+
 class TaskRequest(BaseModel):
     request: str
 
@@ -197,6 +201,17 @@ def create_app(state: AppState | None = None) -> FastAPI:
             raise HTTPException(404, "会话不存在")
         state.db.delete_session(sid)
         return {"ok": True}
+
+    @app.patch("/api/sessions/{sid}")
+    def api_rename_session(sid: str, payload: RenameSession) -> dict[str, Any]:
+        if state.db.get_session(sid) is None:
+            raise HTTPException(404, "会话不存在")
+        if not payload.title.strip():
+            raise HTTPException(400, "标题不能为空")
+        state.db.rename_session(sid, payload.title.strip())
+        s = state.db.get_session(sid)
+        assert s is not None
+        return s.__dict__
 
     @app.get("/api/sessions/{sid}/messages")
     def api_messages(sid: str) -> list[dict[str, Any]]:
