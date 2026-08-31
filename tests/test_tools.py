@@ -36,6 +36,7 @@ def test_registry_contains_all_tools(reg: ToolRegistry) -> None:
         "move_file",
         "delete_file",
         "make_dir",
+        "organize_by_type",
         "read_table",
         "merge_tables",
         "describe_table",
@@ -99,9 +100,45 @@ def test_move_and_list(reg: ToolRegistry, ctx: ToolContext) -> None:
     assert names == {"sub"}
 
 
-def test_make_dir(reg: ToolRegistry, ctx: ToolContext) -> None:
-    reg.execute("make_dir", {"path": "x/y/z"}, ctx)
-    assert (ctx.workspace_root / "x" / "y" / "z").is_dir()
+def test_make_dir_creates_multiple(reg: ToolRegistry, ctx: ToolContext) -> None:
+    r = reg.execute("make_dir", {"paths": ["a/b", "c/d/e"]}, ctx)
+    assert (ctx.workspace_root / "a" / "b").is_dir()
+    assert (ctx.workspace_root / "c" / "d" / "e").is_dir()
+    assert "已创建 2 个目录" in r.summary
+
+
+def test_organize_by_type(reg: ToolRegistry, ctx: ToolContext) -> None:
+    (ctx.workspace_root / "a.csv").write_text("x", encoding="utf-8")
+    (ctx.workspace_root / "b.txt").write_text("y", encoding="utf-8")
+    (ctx.workspace_root / "c.md").write_text("z", encoding="utf-8")
+    r = reg.execute("organize_by_type", {"directory": "."}, ctx)
+    assert r.data["moved"] == 3  # type: ignore[index]
+    assert (ctx.workspace_root / "csv" / "a.csv").exists()
+    assert (ctx.workspace_root / "text" / "b.txt").exists()
+    assert (ctx.workspace_root / "docs" / "c.md").exists()
+
+
+def test_organize_by_type_idempotent(reg: ToolRegistry, ctx: ToolContext) -> None:
+    (ctx.workspace_root / "a.csv").write_text("x", encoding="utf-8")
+    reg.execute("organize_by_type", {"directory": "."}, ctx)
+    r2 = reg.execute("organize_by_type", {"directory": "."}, ctx)
+    assert r2.data["moved"] == 0  # type: ignore[index]
+    assert (ctx.workspace_root / "csv" / "a.csv").exists()
+
+
+def test_organize_by_type_custom_mapping(reg: ToolRegistry, ctx: ToolContext) -> None:
+    (ctx.workspace_root / "cfg.ini").write_text("x", encoding="utf-8")
+    reg.execute("organize_by_type", {"directory": ".", "mapping": {"ini": "config"}}, ctx)
+    assert (ctx.workspace_root / "config" / "cfg.ini").exists()
+
+
+def test_organize_by_type_skips_same_name(reg: ToolRegistry, ctx: ToolContext) -> None:
+    (ctx.workspace_root / "a.csv").write_text("x", encoding="utf-8")
+    (ctx.workspace_root / "csv").mkdir()
+    (ctx.workspace_root / "csv" / "a.csv").write_text("existing", encoding="utf-8")
+    r = reg.execute("organize_by_type", {"directory": "."}, ctx)
+    assert r.data["skipped"] == 1  # type: ignore[index]
+    assert (ctx.workspace_root / "csv" / "a.csv").read_text(encoding="utf-8") == "existing"
 
 
 # ---------- 表格处理 ----------

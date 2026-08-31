@@ -156,14 +156,81 @@ def _delete_file(args: dict, ctx: ToolContext) -> ToolResult:
 
 
 class MakeDirParams(BaseModel):
-    path: str = Field(description="目录路径（相对工作目录）")
+    paths: list[str] = Field(min_length=1, description="要创建的目录路径列表（可一次创建多个）")
 
 
 def _make_dir(args: dict, ctx: ToolContext) -> ToolResult:
-    target = resolve_in_workspace(ctx.workspace_root, args["path"])
-    target.mkdir(parents=True, exist_ok=True)
-    rel = rel_or_abs(target, ctx.workspace_root)
-    return ToolResult(summary=f"已创建目录 {rel}", data={"path": rel})
+    created: list[str] = []
+    for p in args["paths"]:
+        target = resolve_in_workspace(ctx.workspace_root, p)
+        target.mkdir(parents=True, exist_ok=True)
+        created.append(rel_or_abs(target, ctx.workspace_root))
+    return ToolResult(
+        summary=f"已创建 {len(created)} 个目录: {', '.join(created)}",
+        data={"paths": created},
+    )
+
+
+# 按扩展名归类的默认目录映射（可被 mapping 覆盖）
+DEFAULT_TYPE_DIRS = {
+    ".csv": "csv",
+    ".xlsx": "excel",
+    ".xls": "excel",
+    ".txt": "text",
+    ".log": "text",
+    ".md": "docs",
+    ".json": "data",
+    ".ini": "misc",
+}
+
+
+class OrganizeParams(BaseModel):
+    directory: str = Field(default=".", description="要归档整理的目录（相对工作目录）")
+    mapping: dict[str, str] | None = Field(
+        default=None,
+        description="扩展名(不含点，小写) → 目标子目录；不填用默认规则，未知类型归 misc",
+    )
+
+
+def _organize_by_type(args: dict, ctx: ToolContext) -> ToolResult:
+    """按类型把目录下的散落文件归档到对应子目录（批量移动，一步完成）。
+
+    - 不覆盖已存在文件（同名跳过并记录），因此无需确认；
+    - 幂等：再次运行已归档目录时 moved=0。
+    """
+    base = resolve_in_workspace(ctx.workspace_root, args["directory"])
+    if not base.is_dir():
+        return ToolResult(summary=f"目录不存在: {args['directory']}")
+    mapping = {k.lower().lstrip("."): v for k, v in (args.get("mapping") or {}).items()}
+    moved = 0
+    skipped = 0
+    folders: set[str] = set()
+    for child in sorted(base.iterdir()):
+        if child.is_dir():
+            continue
+        ext = child.suffix.lower()
+        folder = mapping.get(ext.lstrip(".")) or DEFAULT_TYPE_DIRS.get(ext, "misc")
+        dest_dir = base / folder
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        folders.add(folder)
+        dest = dest_dir / child.name
+        if dest.exists():
+            skipped += 1
+            continue
+        shutil.move(str(child), str(dest))
+        moved += 1
+    if moved == 0 and skipped == 0:
+        summary = f"目录 {args['directory']} 下没有需要归档的散落文件"
+    else:
+        summary = (
+            f"按类型归档完成：移动 {moved} 个文件"
+            + (f"，跳过 {skipped} 个（同名已存在）" if skipped else "")
+            + f"，目录: {', '.join(sorted(folders))}"
+        )
+    return ToolResult(
+        summary=summary,
+        data={"moved": moved, "skipped": skipped, "folders": sorted(folders)},
+    )
 
 
 def build_file_tools() -> list[Tool]:
@@ -204,8 +271,18 @@ def build_file_tools() -> list[Tool]:
         ),
         Tool(
             name="make_dir",
-            description="创建目录（含父目录）",
+            description="创建目录（可一次创建多个，含父目录）",
             parameters=MakeDirParams,
             func=_make_dir,
+        ),
+        Tool(
+            name="organize_by_type",
+            description=(
+                "按文件类型把目录下散落文件批量归档到对应子目录（csv→csv/、txt→text/、"
+                "md→docs/、其它→misc/，可用 mapping 自定义；不覆盖已存在文件）。"
+                "适合「按类型归档文件」类任务，一次调用完成，避免逐个移动。"
+            ),
+            parameters=OrganizeParams,
+            func=_organize_by_type,
         ),
     ]
