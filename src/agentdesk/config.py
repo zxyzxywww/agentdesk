@@ -26,7 +26,7 @@ class ModelConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    max_steps: int = 20
+    max_steps: int = 40
     max_cost_yuan: float = 2.0
     max_repeated_actions: int = 3
     max_tool_output_chars: int = 4000

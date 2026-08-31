@@ -20,7 +20,6 @@ import type {
   Session,
   StatusInfo,
   TaskResult,
-  WorkspaceEntry,
 } from "./lib/types";
 
 // 三区域尺寸范围与默认值
@@ -62,7 +61,7 @@ export default function App() {
   const [toolCards, setToolCards] = useState<ToolCardData[]>([]);
   const [plan, setPlan] = useState<PlanStep[]>([]);
   const [accept, setAccept] = useState<TaskResult | null>(null);
-  const [files, setFiles] = useState<WorkspaceEntry[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0); // 文件面板刷新信号
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [pending, setPending] = useState<PendingConfirm | null>(null);
 
@@ -105,15 +104,6 @@ export default function App() {
   }, []);
 
   // ---- 加载辅助 ----
-  const loadFiles = useCallback(async () => {
-    try {
-      const r = await api.workspace.files();
-      setFiles(r.entries ?? []);
-    } catch (e) {
-      toast.error("加载文件失败: " + (e as Error).message);
-    }
-  }, []);
-
   const loadBackups = useCallback(async () => {
     try {
       setBackups(await api.backups.list());
@@ -191,7 +181,8 @@ export default function App() {
         toast.error("加载会话消息失败：" + (e as Error).message);
       }
       if (seq !== selectSeq.current) return;
-      await Promise.all([loadFiles(), loadBackups(), loadCost()]);
+      setRefreshKey((k) => k + 1);
+      await Promise.all([loadBackups(), loadCost()]);
       if (seq !== selectSeq.current) return;
       // 恢复挂起确认，或最近已完成任务的面板状态（刷新/切换不丢历史）
       try {
@@ -212,7 +203,7 @@ export default function App() {
         /* 忽略 */
       }
     },
-    [loadFiles, loadBackups, loadCost, restorePanel]
+    [loadBackups, loadCost, restorePanel]
   );
 
   // ---- 任务结束后的验收刷新 ----
@@ -223,9 +214,10 @@ export default function App() {
       } catch {
         /* 忽略 */
       }
-      await Promise.all([loadFiles(), loadBackups(), loadCost()]);
+      setRefreshKey((k) => k + 1);
+      await Promise.all([loadBackups(), loadCost()]);
     },
-    [loadFiles, loadBackups, loadCost]
+    [loadBackups, loadCost]
   );
 
   // ---- 实时事件 ----
@@ -373,12 +365,13 @@ export default function App() {
       try {
         await api.backups.restore(id);
         toast.success("已恢复备份");
-        await Promise.all([loadBackups(), loadFiles()]);
+        setRefreshKey((k) => k + 1);
+        await loadBackups();
       } catch (e) {
         toast.error("恢复失败：" + (e as Error).message);
       }
     },
-    [loadBackups, loadFiles]
+    [loadBackups]
   );
 
   const exportReport = useCallback(async () => {
@@ -467,7 +460,7 @@ export default function App() {
             onTabChange={setTab}
             toolCards={toolCards}
             plan={plan}
-            files={files}
+            refreshKey={refreshKey}
             accept={accept}
             backups={backups}
             onRestore={restoreBackup}

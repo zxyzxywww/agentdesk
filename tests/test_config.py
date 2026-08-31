@@ -11,7 +11,7 @@ def test_load_defaults_from_project_config() -> None:
     settings = load_settings()
     assert settings.model.base_url == "https://api.deepseek.com"
     assert settings.model.chat_model == "deepseek-chat"
-    assert settings.agent.max_steps == 20
+    assert settings.agent.max_steps == 40
     assert settings.agent.max_repeated_actions == 3
     assert settings.search.provider in ("tavily", "fallback")
     assert settings.ui.port == 8000
@@ -39,7 +39,7 @@ def test_workspace_root_is_absolute(tmp_path: Path) -> None:
 
 def test_missing_config_file_uses_defaults(tmp_path: Path) -> None:
     settings = load_settings(tmp_path / "nonexistent.yaml")
-    assert settings.agent.max_steps == 20
+    assert settings.agent.max_steps == 40
     assert settings.model.temperature == 0.2
 
 

@@ -8,7 +8,6 @@ import type {
   BackupRecord,
   PlanStep,
   TaskResult,
-  WorkspaceEntry,
 } from "@/lib/types";
 
 export const PANEL_TABS = ["run", "plan", "files", "accept", "undo"] as const;
@@ -17,18 +16,18 @@ export type PanelTab = (typeof PANEL_TABS)[number];
 export function RightPanel({
   tab,
   onTabChange,
+  refreshKey,
   toolCards,
   plan,
-  files,
   accept,
   backups,
   onRestore,
 }: {
   tab: PanelTab;
   onTabChange: (t: PanelTab) => void;
+  refreshKey: number;
   toolCards: ToolCardData[];
   plan: PlanStep[];
-  files: WorkspaceEntry[];
   accept: TaskResult | null;
   backups: BackupRecord[];
   onRestore: (id: number) => void;
@@ -63,7 +62,7 @@ export function RightPanel({
             <PlanPanel plan={plan} />
           </TabsContent>
           <TabsContent value="files">
-            <FilePanel files={files} />
+            <FilePanel refreshKey={refreshKey} />
           </TabsContent>
           <TabsContent value="accept">
             <AcceptPanel result={accept} />

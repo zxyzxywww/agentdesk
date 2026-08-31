@@ -10,7 +10,7 @@ model:
   max_tokens: 4096
 
 agent:
-  max_steps: 20            # 单任务最大工具调用步数（护栏）
+  max_steps: 40            # 单任务最大工具调用步数（护栏；批量任务建议放宽）
   max_cost_yuan: 2.0       # 单任务最大成本（护栏，元）
   max_repeated_actions: 3  # 相同动作连续重复次数上限（护栏）
   max_tool_output_chars: 4000  # 单次工具结果回填给模型的最大字符数
