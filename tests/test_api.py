@@ -233,3 +233,31 @@ def test_websocket_ping_pong(client: TestClient) -> None:
     with client.websocket_connect("/ws/tasks/nonexistent") as ws:
         ws.send_text("ping")
         assert ws.receive_json()["type"] == "pong"
+
+
+def test_restart_marks_interrupted_tasks_failed(tmp_path: Path) -> None:
+    """服务重启后（runner 内存丢失），running/waiting_confirm 任务应被标记失败，
+    避免前端恢复出无法确认的挂起弹窗。"""
+    settings = load_settings()
+    settings.workspace.root = str(tmp_path / "ws")
+    settings.storage.backups_dir = str(tmp_path / "backups")
+    settings.storage.db_path = str(tmp_path / "app.db")
+    (tmp_path / "ws").mkdir(parents=True, exist_ok=True)
+
+    # 先造一个「上次服务遗留」的挂起任务
+    db = DB(settings=settings)
+    s = db.create_session()
+    t1 = db.create_task(s.id, "挂起任务")
+    db.update_task(t1.id, status="waiting_confirm")
+    t2 = db.create_task(s.id, "运行中任务")
+    db.update_task(t2.id, status="running")
+    t3 = db.create_task(s.id, "已完成任务")
+    db.update_task(t3.id, status="done")
+
+    # 重新启动（新建 AppState 模拟服务重启）
+    state = AppState(settings=settings)
+    assert state.db.get_task(t1.id) is not None
+    assert state.db.get_task(t1.id).status == "failed"  # type: ignore[union-attr]
+    assert state.db.get_task(t2.id).status == "failed"  # type: ignore[union-attr]
+    assert state.db.get_task(t3.id).status == "done"  # type: ignore[union-attr]
+    assert "服务重启" in state.db.get_task(t1.id).summary  # type: ignore[union-attr]

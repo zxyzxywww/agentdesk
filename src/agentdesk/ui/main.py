@@ -53,6 +53,7 @@ class AppState:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self.db = DB(settings=self.settings)
+        self._mark_interrupted_tasks()
         self.registry = ToolRegistry(build_default_tools())
         self.runners: dict[str, AgentRunner] = {}
         self.ws_clients: dict[str, set[WebSocket]] = {}
@@ -60,6 +61,20 @@ class AppState:
         self.loop: asyncio.AbstractEventLoop | None = None
         self.llm_factory: Callable[[Settings], LLMClient] = lambda s: LLMClient(s)
         self.planner_factory: Callable[[LLMClient, Settings], Planner] = Planner
+
+    def _mark_interrupted_tasks(self) -> None:
+        """服务重启后，内存 runner 已丢失：把 running/waiting_confirm 的任务标记为失败，
+        避免前端恢复出「无法确认」的挂起弹窗。"""
+        for task in self.db.list_all_tasks():
+            if task.status in ("running", "waiting_confirm"):
+                self.db.update_task(
+                    task.id,
+                    status="failed",
+                    summary=(
+                        f"任务中断：服务重启后无法继续（原状态 {task.status}），"
+                        "请重新发起任务。"
+                    ),
+                )
 
     def llm_for(self, session_id: str) -> LLMClient:
         if session_id not in self.llm_clients:

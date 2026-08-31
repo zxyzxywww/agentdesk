@@ -238,8 +238,14 @@ export default function App() {
       try {
         await api.tasks.confirm(taskId, callId);
       } catch (e) {
-        toast.error("确认失败：" + (e as Error).message);
+        const msg = (e as Error).message;
+        toast.error(
+          msg.includes("不存在") || msg.includes("404")
+            ? "该任务已失效（服务可能重启过），请重新发起任务"
+            : "确认失败：" + msg
+        );
         setRunning(false);
+        setTaskId(null);
       }
     },
     [taskId]
@@ -252,8 +258,14 @@ export default function App() {
       try {
         await api.tasks.reject(taskId, callId);
       } catch (e) {
-        toast.error("操作失败：" + (e as Error).message);
+        const msg = (e as Error).message;
+        toast.error(
+          msg.includes("不存在") || msg.includes("404")
+            ? "该任务已失效（服务可能重启过），请重新发起任务"
+            : "操作失败：" + msg
+        );
         setRunning(false);
+        setTaskId(null);
       }
     },
     [taskId]
