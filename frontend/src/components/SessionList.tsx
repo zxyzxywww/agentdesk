@@ -45,6 +45,7 @@ export function SessionList({
           return (
             <div
               key={s.id}
+              data-session-id={s.id}
               onClick={() => onSelect(s)}
               className={cn(
                 "group relative flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors",

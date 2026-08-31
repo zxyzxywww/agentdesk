@@ -41,6 +41,9 @@ export default function App() {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
 
   const msgSeq = useRef(0);
+  const sessionRef = useRef<Session | null>(null);
+  const selectSeq = useRef(0);
+  const didInit = useRef(false);
   const appendMessage = useCallback((role: "user" | "assistant", content: string) => {
     msgSeq.current += 1;
     setMessages((prev) => [
@@ -67,8 +70,8 @@ export default function App() {
     }
   }, []);
 
-  const loadCost = useCallback(async (sessionId?: string) => {
-    const sid = sessionId ?? currentSession?.id;
+  const loadCost = useCallback(async () => {
+    const sid = sessionRef.current?.id;
     if (!sid) return;
     try {
       const tasks = await api.sessions.tasks(sid);
@@ -76,7 +79,7 @@ export default function App() {
     } catch {
       /* 忽略 */
     }
-  }, [currentSession?.id]);
+  }, []);
 
   const loadSessions = useCallback(async () => {
     const list = await api.sessions.list();
@@ -116,6 +119,8 @@ export default function App() {
   const selectSession = useCallback(
     async (session: Session) => {
       const id = session.id;
+      const seq = ++selectSeq.current; // 竞态守卫：快速切换时丢弃过期响应
+      sessionRef.current = session;
       setCurrentSession(session);
       setTaskId(null);
       setRunning(false);
@@ -124,26 +129,32 @@ export default function App() {
       setPlan([]);
       setAccept(null);
       try {
-        setMessages(await api.sessions.messages(id));
+        const msgs = await api.sessions.messages(id);
+        if (seq !== selectSeq.current) return;
+        setMessages(msgs);
       } catch (e) {
+        if (seq !== selectSeq.current) return;
         // 失败时清空并提示，避免显示上一个会话的消息造成张冠李戴
         setMessages([]);
         toast.error("加载会话消息失败：" + (e as Error).message);
       }
-      await Promise.all([loadFiles(), loadBackups(), loadCost(id)]);
+      if (seq !== selectSeq.current) return;
+      await Promise.all([loadFiles(), loadBackups(), loadCost()]);
+      if (seq !== selectSeq.current) return;
       // 恢复挂起确认，或最近已完成任务的面板状态（刷新/切换不丢历史）
       try {
         const tasks = await api.sessions.tasks(id);
+        if (seq !== selectSeq.current) return;
         const hanging = tasks.find((t) => t.status === "waiting_confirm");
         if (hanging) {
           setTaskId(hanging.id);
           const p = await api.tasks.pending(hanging.id);
-          if (p) setPending(p);
+          if (seq === selectSeq.current && p) setPending(p);
         } else {
           const lastDone = [...tasks]
             .reverse()
             .find((t) => ["done", "stopped", "failed"].includes(t.status));
-          if (lastDone) await restorePanel(lastDone.id);
+          if (seq === selectSeq.current && lastDone) await restorePanel(lastDone.id);
         }
       } catch {
         /* 忽略 */
@@ -332,8 +343,10 @@ export default function App() {
     URL.revokeObjectURL(a.href);
   }, [currentSession]);
 
-  // ---- 初始化 ----
+  // ---- 初始化（仅一次；didInit 守卫防 StrictMode 双执行） ----
   useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
     (async () => {
       try {
         setStatus(await api.status());
