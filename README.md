@@ -39,8 +39,8 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 ## 架构概览
 
 ```
-┌─ 前端（Tabler 深色工作台，三栏）──────────────────────────┐
-│ 左：会话列表  中：对话区  右：执行 / 计划 / 文件 / 验收 / 撤销 │
+┌─ 前端（frontend/：Vite + React + TS + Tailwind + shadcn/ui + Motion）──┐
+│ 白色现代三栏：会话列表 / 对话区 / 执行·计划·文件·验收·撤销（构建产物托管） │
 └───────────────┬───────────────────────────────────────┘
                 │ REST + WebSocket（实时工具状态流）
 ┌─ FastAPI 后端（agentdesk/ui/main.py）─────────────────────┐
@@ -101,7 +101,10 @@ agentdesk/
 │   ├── tools/             # registry + file_ops/data_ops/code_runner/web_research
 │   ├── llm/               # OpenAI 兼容客户端（token/成本统计）
 │   ├── storage/           # SQLite + 备份回滚
-│   └── ui/                # FastAPI + static（Tabler 前端）
+│   └── ui/                # FastAPI（API/WS/托管 frontend/dist）
+├── frontend/              # Vite + React + TS + Tailwind + shadcn/ui + Motion
+│   ├── src/               # 组件与 hooks（App/TopBar/Chat/Panels/…）
+│   └── dist/              # 构建产物（.gitignore，由 FastAPI 托管）
 ├── scripts/smoke.py       # 真实冒烟任务
 ├── tests/                 # 93 个离线测试
 └── docs/                  # 设计文档 / 简历素材 / 面试深挖 / Demo 脚本
@@ -109,8 +112,10 @@ agentdesk/
 
 ## 技术栈
 
-Python 3.12 · FastAPI + WebSocket · Tabler（Bootstrap 5）· OpenAI 兼容 API（DeepSeek）·
+后端：Python 3.12 · FastAPI + WebSocket · OpenAI 兼容 API（DeepSeek）·
 Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / mypy · uv · Docker
+前端：Vite + React + TypeScript + Tailwind CSS + shadcn/ui 风格组件 + Motion 动效
+（构建产物由 FastAPI 直接托管，单服务单端口；开发模式 `npm run dev` 代理到 8000）
 
 ## 诚实边界（README 如实披露）
 
@@ -118,7 +123,7 @@ Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / my
   只建议在本机可信环境使用，文档已写明风险。
 - **免 key 搜索（DuckDuckGo/Bing 解析）稳定性较弱**，正式演示建议配 Tavily 免费 key。
 - **成本为估算值**：按 DeepSeek 公开定价的价格表计算，精确费用以账单为准。
-- **前端依赖 CDN**（Tabler），离线时样式退化但功能不受影响。
+- **字体走 Google Fonts CDN**（Inter / JetBrains Mono），离线时回退系统字体，功能不受影响。
 
 ## 参考
 

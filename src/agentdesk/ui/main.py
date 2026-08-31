@@ -31,7 +31,8 @@ from agentdesk.storage.db import DB
 from agentdesk.tools import build_default_tools
 from agentdesk.tools.registry import ToolContext, ToolRegistry
 
-STATIC_DIR = Path(__file__).parent / "static"
+# 前端构建产物（Vite + React + Tailwind），由 FastAPI 直接托管
+FRONTEND_DIST = Path(__file__).resolve().parents[3] / "frontend" / "dist"
 
 
 class CreateSession(BaseModel):
@@ -102,11 +103,14 @@ def _run_agent(state: AppState, runner: AgentRunner) -> None:
 def _confirm_agent(state: AppState, runner: AgentRunner, call_id: int) -> None:
     try:
         runner.confirm(call_id)
+    except AgentPaused:
+        pass  # 又遇到需确认的危险操作，保留 runner，等待下一次 confirm/reject
     except Exception as e:  # noqa: BLE001
         state.on_event(
             AgentEvent(type="error", task_id=runner.task_id, data={"error": str(e)})
         )
-    finally:
+        state.runners.pop(runner.task_id, None)
+    else:
         state.runners.pop(runner.task_id, None)
 
 
@@ -132,7 +136,19 @@ def create_app(state: AppState | None = None) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
-        return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        """返回前端 SPA（frontend/dist 构建产物）；未构建时给出提示。"""
+        html_file = FRONTEND_DIST / "index.html"
+        if html_file.exists():
+            return html_file.read_text(encoding="utf-8")
+        return (
+            "<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'>"
+            "<title>AgentDesk</title></head>"
+            "<body style='font-family:system-ui,sans-serif;padding:2.5rem;line-height:1.7'>"
+            "<h2>AgentDesk</h2>"
+            "<p>前端尚未构建：请先在 <code>frontend/</code> 目录执行 "
+            "<code>npm install</code> 与 <code>npm run build</code>。</p>"
+            "</body></html>"
+        )
 
     # ---------- 状态 ----------
 
@@ -232,13 +248,16 @@ def create_app(state: AppState | None = None) -> FastAPI:
         def _reject_agent() -> None:
             try:
                 runner.reject(payload.call_id)
+            except AgentPaused:
+                pass  # 拒绝后又遇到新确认，保留 runner
             except Exception as e:  # noqa: BLE001
                 state.on_event(
                     AgentEvent(
                         type="error", task_id=runner.task_id, data={"error": str(e)}
                     )
                 )
-            finally:
+                state.runners.pop(runner.task_id, None)
+            else:
                 state.runners.pop(runner.task_id, None)
 
         threading.Thread(target=_reject_agent, daemon=True).start()
@@ -312,5 +331,8 @@ def create_app(state: AppState | None = None) -> FastAPI:
 
     # ---------- 静态资源 ----------
 
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    if FRONTEND_DIST.exists():
+        app.mount(
+            "/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets"
+        )
     return app

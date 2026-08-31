@@ -37,10 +37,13 @@ SYSTEM_PROMPT = """你是 AgentDesk，一个运行在用户本地数据目录中
 规则：
 1. 使用中文与用户交流；需要操作文件/数据时调用工具。
 2. 所有路径都是相对工作目录的相对路径。
-3. 删除、覆盖、执行代码等危险操作会自动请求用户确认；确认后继续。
-4. 每完成关键步骤尽量用 list_files / read_table 验证产出。
-5. 任务完成后，用一段话总结：做了什么、产出文件在哪、结果如何。
-6. 不要编造文件或结果；一切以工具返回为准。"""
+3. 【优先用内置工具】读取/合并/统计表格用 read_table/merge_tables/describe_table，
+   操作文件用 list_files/read_file/write_file/move_file 等；只有内置工具无法完成
+   时才用 run_python 编写脚本（脚本是危险操作，需用户确认，能不用就不要用）。
+4. 删除、覆盖、执行代码等危险操作会自动请求用户确认；确认后继续。
+5. 每完成关键步骤尽量用 list_files / read_table 验证产出。
+6. 任务完成后，用一段话总结：做了什么、产出文件在哪、结果如何。
+7. 不要编造文件或结果；一切以工具返回为准。"""
 
 MAX_HISTORY_MESSAGES = 40
 
@@ -108,6 +111,22 @@ class AgentRunner:
         if self.on_event is not None:
             self.on_event(AgentEvent(type=etype, task_id=self.task_id, data=data))
 
+    def _hang(self, pause: AgentPaused) -> None:
+        """任务进入等待确认的挂起态：更新状态并通知 UI。"""
+        self.db.update_task(self.task_id, status="waiting_confirm")
+        self._emit("needs_confirm", call_id=pause.call_id, reason=pause.reason)
+
+    def _fail(self, e: Exception) -> None:
+        """任务失败：更新状态并通知 UI。"""
+        self.db.update_task(self.task_id, status="failed", summary=f"任务失败: {e}")
+        self._emit("error", error=str(e))
+
+    def _loop_then_finish(self) -> TaskRecord:
+        """执行循环并收尾；若再次需确认则抛 AgentPaused（由调用方挂起一次）。"""
+        self._loop()
+        status = "stopped" if self._stop_reason else "done"
+        return self._finish(status)
+
     # ---------- 主流程 ----------
 
     def run(self) -> TaskRecord:
@@ -123,18 +142,12 @@ class AgentRunner:
             self._emit("plan", plan=[s.model_dump() for s in self._plan])
 
             self._messages = self._initial_messages()
-            self._loop()
-            status = "stopped" if self._stop_reason else "done"
-            return self._finish(status)
+            return self._loop_then_finish()
         except AgentPaused as pause:
-            self.db.update_task(self.task_id, status="waiting_confirm")
-            self._emit(
-                "needs_confirm", call_id=pause.call_id, reason=pause.reason
-            )
+            self._hang(pause)
             raise
         except Exception as e:  # noqa: BLE001 - 兜底：任何异常都记录为失败
-            self.db.update_task(self.task_id, status="failed", summary=f"任务失败: {e}")
-            self._emit("error", error=str(e))
+            self._fail(e)
             raise
 
     def confirm(self, call_id: int) -> TaskRecord:
@@ -153,9 +166,12 @@ class AgentRunner:
             task_id=self.task_id,
         )
         self._execute_tool_call(name, args, seq, ctx, tool_call_id, existing_call_id=db_call_id)
-        self._loop()
-        status = "stopped" if self._stop_reason else "done"
-        return self._finish(status)
+        try:
+            return self._loop_then_finish()
+        except AgentPaused as pause:
+            # 确认后又遇到新的危险操作：转入挂起态（并通知 UI 再次确认）
+            self._hang(pause)
+            raise
 
     def reject(self, call_id: int) -> TaskRecord:
         """用户拒绝该操作：记录为失败并提示模型调整方案，继续任务（阻塞直到结束）。"""
@@ -182,9 +198,11 @@ class AgentRunner:
                 "content": "用户拒绝了该操作。请调整方案，不要重复请求同一个操作。",
             }
         )
-        self._loop()
-        status = "stopped" if self._stop_reason else "done"
-        return self._finish(status)
+        try:
+            return self._loop_then_finish()
+        except AgentPaused as pause:
+            self._hang(pause)
+            raise
 
     def cancel(self) -> None:
         """请求中断（UI 停止按钮调用）。"""

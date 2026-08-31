@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* ============ AgentDesk 设计 token（白色现代 · Linear 风） ============ */
+@theme {
+  --color-background: oklch(0.99 0.003 247);
+  --color-foreground: oklch(0.23 0.02 257);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.23 0.02 257);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.23 0.02 257);
+  --color-primary: oklch(0.68 0.15 55);
+  --color-primary-foreground: oklch(1 0 0);
+  --color-secondary: oklch(0.965 0.005 250);
+  --color-secondary-foreground: oklch(0.32 0.02 255);
+  --color-muted: oklch(0.965 0.005 250);
+  --color-muted-foreground: oklch(0.52 0.015 255);
+  --color-accent: oklch(0.96 0.02 60);
+  --color-accent-foreground: oklch(0.55 0.13 55);
+  --color-destructive: oklch(0.58 0.21 25);
+  --color-destructive-foreground: oklch(1 0 0);
+  --color-border: oklch(0.92 0.006 250);
+  --color-input: oklch(0.92 0.006 250);
+  --color-ring: oklch(0.68 0.15 55);
+  --color-success: oklch(0.62 0.15 155);
+  --color-warning: oklch(0.7 0.14 70);
+
+  --radius: 0.625rem;
+  --radius-sm: 0.4rem;
+  --radius-lg: 0.875rem;
+
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+}
+
+/* 细滚动条 */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: oklch(0.86 0.008 250);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.78 0.01 250);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 通用动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+

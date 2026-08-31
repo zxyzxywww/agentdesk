@@ -170,6 +170,42 @@ def test_confirm_mismatch_raises(tmp_path: Path) -> None:
         runner.confirm(9999)
 
 
+def test_confirmation_after_confirm_does_not_get_stuck(tmp_path: Path) -> None:
+    """连续危险操作：确认后再遇到新确认，应再次挂起且不报错不丢 runner。"""
+    (tmp_path / "existing.txt").write_text("old", encoding="utf-8")
+    (tmp_path / "keep.txt").write_text("keep", encoding="utf-8")
+    runner, events, db, _ = _make_env(
+        tmp_path,
+        [
+            _plan_response(),
+            _tool_call("write_file", json.dumps({"path": "existing.txt", "content": "new"})),
+            _tool_call("write_file", json.dumps({"path": "keep.txt", "content": "k2"})),
+            _text("完成"),
+        ],
+    )
+    # 触发第一次挂起
+    with pytest.raises(AgentPaused):
+        runner.run()
+    assert len([e for e in events if e.type == "needs_confirm"]) == 1
+    task = db.get_task(runner.task_id)
+    assert task is not None and task.status == "waiting_confirm"
+
+    # 确认后：循环里又遇到新的危险操作 → 二次挂起（而非报错/丢失 runner）
+    with pytest.raises(AgentPaused):
+        runner.confirm(1)
+    task = db.get_task(runner.task_id)
+    assert task is not None and task.status == "waiting_confirm"
+    confirm_events = [e for e in events if e.type == "needs_confirm"]
+    assert len(confirm_events) == 2  # 两次挂起各发一次，无重复
+    assert confirm_events[1].data["call_id"] == 2  # 第二次是新的 tool_call
+
+    # 第二次确认后任务正常完成
+    final = runner.confirm(2)
+    assert final.status == "done"
+    assert (tmp_path / "existing.txt").read_text(encoding="utf-8") == "new"
+    assert (tmp_path / "keep.txt").read_text(encoding="utf-8") == "k2"
+
+
 def test_max_steps_guard(tmp_path: Path) -> None:
     responses = [_plan_response()] + [_tool_call("list_files") for _ in range(5)]
     runner, _, _, _ = _make_env(tmp_path, responses, max_steps=3)
