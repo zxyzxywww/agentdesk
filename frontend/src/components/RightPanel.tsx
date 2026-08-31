@@ -42,7 +42,7 @@ export function RightPanel({
   };
 
   return (
-    <aside className="flex w-[400px] shrink-0 flex-col border-l bg-card/40">
+    <aside className="flex h-full w-full shrink-0 flex-col border-l bg-card/40">
       <div className="px-3 pt-3">
         <Tabs value={tab} onValueChange={(v) => onTabChange(v as PanelTab)}>
           <TabsList>

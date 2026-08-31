@@ -9,6 +9,8 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import type { ToolCardData } from "./components/panels/ToolLog";
 import { api } from "./lib/api";
 import { useTaskSocket } from "./lib/ws";
+import { useDrag } from "./lib/useDrag";
+import { clamp } from "./lib/utils";
 import type {
   AgentEvent,
   BackupRecord,
@@ -20,6 +22,30 @@ import type {
   TaskResult,
   WorkspaceEntry,
 } from "./lib/types";
+
+// 三区域尺寸范围与默认值
+const LAYOUT_KEY = "agentdesk.layout";
+const LEFT = { min: 180, max: 420, def: 240 };
+const RIGHT = { min: 300, max: 650, def: 400 };
+const BOTTOM = { min: 130, max: 400, def: 200 };
+
+function loadLayout() {
+  let left = LEFT.def;
+  let right = RIGHT.def;
+  let bottom = BOTTOM.def;
+  try {
+    const raw = localStorage.getItem(LAYOUT_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as Record<string, number>;
+      left = clamp(Number(p.left) || LEFT.def, LEFT.min, LEFT.max);
+      right = clamp(Number(p.right) || RIGHT.def, RIGHT.min, RIGHT.max);
+      bottom = clamp(Number(p.bottom) || BOTTOM.def, BOTTOM.min, BOTTOM.max);
+    }
+  } catch {
+    /* 忽略损坏数据 */
+  }
+  return { left, right, bottom };
+}
 
 export default function App() {
   // ---- 顶部与会话 ----
@@ -44,6 +70,32 @@ export default function App() {
   const sessionRef = useRef<Session | null>(null);
   const selectSeq = useRef(0);
   const didInit = useRef(false);
+
+  // ---- 三区域可拖拽布局：尺寸状态 + 持久化 ----
+  const [layout, setLayout] = useState(loadLayout);
+  const setLeft = useCallback(
+    (d: number) => setLayout((l) => ({ ...l, left: clamp(l.left + d, LEFT.min, LEFT.max) })),
+    []
+  );
+  const setRight = useCallback(
+    (d: number) => setLayout((l) => ({ ...l, right: clamp(l.right - d, RIGHT.min, RIGHT.max) })),
+    []
+  );
+  const setBottom = useCallback(
+    (d: number) => setLayout((l) => ({ ...l, bottom: clamp(l.bottom - d, BOTTOM.min, BOTTOM.max) })),
+    []
+  );
+  const leftDrag = useDrag("x", setLeft);
+  const rightDrag = useDrag("x", setRight);
+  const bottomDrag = useDrag("y", setBottom);
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+    } catch {
+      /* 忽略 */
+    }
+  }, [layout]);
+
   const appendMessage = useCallback((role: "user" | "assistant", content: string) => {
     msgSeq.current += 1;
     setMessages((prev) => [
@@ -359,52 +411,74 @@ export default function App() {
     <div className="flex h-screen flex-col overflow-hidden">
       <TopBar status={status} running={running} cost={cost} />
       <div className="flex flex-1 overflow-hidden">
-        <SessionList
-          sessions={sessions}
-          currentId={currentSession?.id ?? null}
-          onSelect={selectSession}
-          onCreate={async () => {
-            try {
-              const s = await api.sessions.create();
+        <div className="relative shrink-0" style={{ width: layout.left }}>
+          <SessionList
+            sessions={sessions}
+            currentId={currentSession?.id ?? null}
+            onSelect={selectSession}
+            onCreate={async () => {
+              try {
+                const s = await api.sessions.create();
+                await loadSessions();
+                await selectSession(s);
+                toast.success("已创建新会话");
+              } catch (e) {
+                toast.error("新建会话失败：" + (e as Error).message);
+              }
+            }}
+            onDelete={async (id) => {
+              await api.sessions.remove(id);
+              if (currentSession?.id === id) setCurrentSession(null);
               await loadSessions();
-              await selectSession(s);
-              toast.success("已创建新会话");
-            } catch (e) {
-              toast.error("新建会话失败：" + (e as Error).message);
-            }
-          }}
-          onDelete={async (id) => {
-            await api.sessions.remove(id);
-            if (currentSession?.id === id) setCurrentSession(null);
-            await loadSessions();
-          }}
-          onRename={async (id, title) => {
-            try {
-              await api.sessions.rename(id, title);
-              await loadSessions();
-              setCurrentSession((prev) =>
-                prev && prev.id === id ? { ...prev, title } : prev
-              );
-            } catch (e) {
-              toast.error("重命名失败：" + (e as Error).message);
-            }
-          }}
-          onExport={exportReport}
-        />
+            }}
+            onRename={async (id, title) => {
+              try {
+                await api.sessions.rename(id, title);
+                await loadSessions();
+                setCurrentSession((prev) =>
+                  prev && prev.id === id ? { ...prev, title } : prev
+                );
+              } catch (e) {
+                toast.error("重命名失败：" + (e as Error).message);
+              }
+            }}
+            onExport={exportReport}
+          />
+          <div
+            onPointerDown={leftDrag}
+            data-resize="left"
+            className="absolute right-0 inset-y-0 w-1.5 cursor-col-resize transition-colors hover:bg-primary/40"
+            title="拖拽调整会话栏宽度"
+          />
+        </div>
         <main className="flex min-w-0 flex-1 flex-col">
           <Chat messages={messages} />
-          <Composer running={running} onSend={sendTask} onStop={stopTask} />
+          <Composer
+            running={running}
+            height={layout.bottom}
+            onResizeStart={bottomDrag}
+            onSend={sendTask}
+            onStop={stopTask}
+          />
         </main>
-        <RightPanel
-          tab={tab}
-          onTabChange={setTab}
-          toolCards={toolCards}
-          plan={plan}
-          files={files}
-          accept={accept}
-          backups={backups}
-          onRestore={restoreBackup}
-        />
+        <div className="relative shrink-0" style={{ width: layout.right }}>
+          <RightPanel
+            tab={tab}
+            onTabChange={setTab}
+            toolCards={toolCards}
+            plan={plan}
+            files={files}
+            accept={accept}
+            backups={backups}
+            onRestore={restoreBackup}
+          />
+          <div
+            onPointerDown={rightDrag}
+            data-resize="right"
+            className="absolute left-0 inset-y-0 w-1.5 -translate-x-1/2 cursor-col-resize transition-colors hover:bg-primary/40"
+            title="拖拽调整执行面板宽度"
+          />
+        </div>
       </div>
       <ConfirmDialog pending={pending} onConfirm={confirmTask} onReject={rejectTask} />
     </div>

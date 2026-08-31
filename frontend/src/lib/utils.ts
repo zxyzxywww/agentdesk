@@ -15,3 +15,7 @@ export function fmtSize(n: number): string {
 export function fmtCost(n: number): string {
   return `¥${Number(n || 0).toFixed(4)}`;
 }
+
+export function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}

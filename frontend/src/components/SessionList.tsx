@@ -21,7 +21,7 @@ export function SessionList({
   onExport: () => void;
 }) {
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r bg-card/50">
+    <aside className="flex h-full w-full shrink-0 flex-col border-r bg-card/50">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
           会话
