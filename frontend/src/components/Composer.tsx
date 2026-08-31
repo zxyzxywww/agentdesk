@@ -57,6 +57,7 @@ export function Composer({
       <Textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
+        className="resize-y min-h-[84px]"
         placeholder="下达任务，例如：把工作目录下所有 csv 合并为一个 all.csv · Enter 发送，Shift+Enter 换行"
         onKeyDown={(e) => {
           if (e.key === "Enter" && !e.shiftKey) {

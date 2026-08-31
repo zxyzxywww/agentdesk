@@ -223,10 +223,7 @@ export default function App() {
         case "done":
         case "stopped": {
           setRunning(false);
-          appendMessage(
-            "assistant",
-            String(e.data.summary ?? (e.type === "done" ? "任务完成 ✅" : "任务已停止"))
-          );
+          // 最终答复已由 message 事件提供，这里不再 append，避免重复
           if (taskId) void finishTask(taskId);
           break;
         }
