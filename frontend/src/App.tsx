@@ -125,8 +125,10 @@ export default function App() {
       setAccept(null);
       try {
         setMessages(await api.sessions.messages(id));
-      } catch {
+      } catch (e) {
+        // 失败时清空并提示，避免显示上一个会话的消息造成张冠李戴
         setMessages([]);
+        toast.error("加载会话消息失败：" + (e as Error).message);
       }
       await Promise.all([loadFiles(), loadBackups(), loadCost(id)]);
       // 恢复挂起确认，或最近已完成任务的面板状态（刷新/切换不丢历史）
@@ -352,9 +354,14 @@ export default function App() {
           currentId={currentSession?.id ?? null}
           onSelect={selectSession}
           onCreate={async () => {
-            const s = await api.sessions.create();
-            await loadSessions();
-            await selectSession(s);
+            try {
+              const s = await api.sessions.create();
+              await loadSessions();
+              await selectSession(s);
+              toast.success("已创建新会话");
+            } catch (e) {
+              toast.error("新建会话失败：" + (e as Error).message);
+            }
           }}
           onDelete={async (id) => {
             await api.sessions.remove(id);
