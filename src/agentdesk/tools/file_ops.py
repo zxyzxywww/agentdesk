@@ -181,6 +181,7 @@ DEFAULT_TYPE_DIRS = {
     ".md": "docs",
     ".json": "data",
     ".ini": "misc",
+    ".py": "code",
 }
 
 
