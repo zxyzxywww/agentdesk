@@ -15,10 +15,12 @@ from openai import OpenAI
 
 from agentdesk.config import Settings, get_settings
 
-# 模型价格表（元 / 百万 tokens）：(输入价, 输出价)，按 DeepSeek 公开定价近似
+# 模型价格表（元 / 百万 tokens）：(输入价, 输出价)，按各平台公开定价近似
 MODEL_PRICES: dict[str, tuple[float, float]] = {
     "deepseek-chat": (2.0, 3.0),
     "deepseek-reasoner": (4.0, 16.0),
+    # 火山方舟 deepseek-v4-flash-ga-260731：计价以方舟控制台账单为准，先用默认价近似
+    "deepseek-v4-flash-ga-260731": (2.0, 3.0),
 }
 DEFAULT_PRICE: tuple[float, float] = (2.0, 3.0)
 

@@ -9,8 +9,8 @@ from agentdesk.config import PROJECT_ROOT, load_settings
 
 def test_load_defaults_from_project_config() -> None:
     settings = load_settings()
-    assert settings.model.base_url == "https://api.deepseek.com"
-    assert settings.model.chat_model == "deepseek-chat"
+    assert settings.model.base_url == "https://ark.cn-beijing.volces.com/api/v3"
+    assert settings.model.chat_model == "deepseek-v4-flash-ga-260731"
     assert settings.agent.max_steps == 40
     assert settings.agent.max_repeated_actions == 3
     assert settings.search.provider in ("tavily", "fallback")
