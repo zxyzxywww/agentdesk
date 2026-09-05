@@ -182,6 +182,7 @@ DEFAULT_TYPE_DIRS = {
     ".json": "data",
     ".ini": "misc",
     ".py": "code",
+    ".html": "web",
 }
 
 
