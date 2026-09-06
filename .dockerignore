@@ -11,3 +11,4 @@ tests
 scripts
 .env
 *.db
+frontend/node_modules
