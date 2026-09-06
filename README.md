@@ -130,3 +130,5 @@ Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / my
 - [docs/设计文档.md](docs/设计文档.md) —— 架构与设计决策
 - [docs/简历素材.md](docs/简历素材.md) —— 简历条目 + 面试深挖清单
 - [docs/Live-Demo-录屏脚本.md](docs/Live-Demo-录屏脚本.md) —— 演示流程
+
+# 分支练习占位

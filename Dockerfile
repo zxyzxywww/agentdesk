@@ -9,11 +9,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# 先复制依赖清单，利用构建缓存
-COPY pyproject.toml uv.lock ./
+# 先复制依赖清单 + 构建项目本体所需的 README/源码，利用构建缓存
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
 RUN uv sync --frozen --no-dev
 
-# 复制源码与配置（.dockerignore 排除 data/tests/docs/.env 等）
+# 复制其余源码与配置（.dockerignore 排除 data/tests/docs/.env 等）
 COPY . .
 
 EXPOSE 8000
