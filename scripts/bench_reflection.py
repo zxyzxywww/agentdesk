@@ -45,17 +45,18 @@ def build_cases():
     return [
         _make_case(
             "写报告文件",
-            "在工作目录创建 report.md，内容包含一行：已完成。",
+            "请创建文件 report.md，内容为一行文字：已完成。（直接放在当前目录根下，不要建子目录）",
             lambda r: nonempty(r, "report.md"),
         ),
         _make_case(
             "整理散落文件",
-            "把工作目录下散落的 .txt 文件按类型归档到 text 子目录（用 organize_by_type）。",
+            "请把当前目录下的 a.txt 和 b.txt 移动到 text/ 子目录里（先创建 text 目录）。",
             lambda r: exists(r, "text/a.txt") and exists(r, "text/b.txt"),
         ),
         _make_case(
             "合并两个表格",
-            "把 data1.csv 与 data2.csv 按列合并成 merged.csv（保留表头）。",
+            "把当前目录下的 data1.csv 与 data2.csv 按列合并成一个 merged.csv"
+            "（保留表头，结果直接放在当前目录）。",
             lambda r: (
                 exists(r, "merged.csv")
                 and len(
@@ -66,12 +67,13 @@ def build_cases():
         ),
         _make_case(
             "写三份分节文档",
-            "创建 docs/ 目录并写入 3 个文件：第1节.md/第2节.md/第3节.md，各含一行标题。",
+            "创建 docs/ 子目录并写入 3 个文件：第1节.md/第2节.md/第3节.md，各含一行标题。",
             lambda r: all(exists(r, f"docs/第{i}节.md") for i in (1, 2, 3)),
         ),
         _make_case(
             "统计目录文件",
-            "用 count_files 统计工作目录文件数，把结果写入 stats.txt（一行：共N个文件）。",
+            "用 count_files 统计当前目录文件数，把结果写入当前目录下的 stats.txt"
+            "（内容写一行：共N个文件）。",
             lambda r: nonempty(r, "stats.txt"),
         ),
     ]
@@ -92,6 +94,7 @@ def run_one(
     settings, request: str, workspace: pathlib.Path, reflections: int, check
 ) -> dict:
     settings.agent.max_reflections = reflections
+    settings.workspace.root = str(workspace)  # 每个任务独立工作目录（关键：避免串扰/已存在误报）
     db = DB(db_path=workspace / "bench.db", settings=settings)
     session = db.create_session(workspace=str(workspace))
     task = db.create_task(session.id, request)
