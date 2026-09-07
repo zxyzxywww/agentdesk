@@ -121,6 +121,7 @@ class AgentRunner:
         self._plan: list[PlanStep] = []
         self._stop_reason: str | None = None
         self._reflection_rounds = 0
+        self._history_context = ""
         self.final_summary = ""
 
     # ---------- 事件 ----------
@@ -150,6 +151,11 @@ class AgentRunner:
     def run(self) -> TaskRecord:
         """阻塞执行任务。需确认时抛 AgentPaused（任务状态 waiting_confirm）。"""
         self.db.update_task(self.task_id, status="running")
+        # 会话记忆：把本会话最近一次已完成任务的结论带给新任务（联系上下文）
+        for prev in reversed(self.db.list_tasks(self.session_id)):
+            if prev.id != self.task_id and prev.status in ("done", "stopped") and prev.summary:
+                self._history_context = prev.summary[:400]
+                break
         self.db.add_message(self.session_id, "user", self.user_request)
         try:
             self._plan = self.planner.plan(self.user_request, self.registry.openai_schema())
@@ -230,14 +236,13 @@ class AgentRunner:
 
     def _initial_messages(self) -> list[dict[str, Any]]:
         plan_text = "\n".join(f"{i + 1}. {s.goal}" for i, s in enumerate(self._plan))
+        parts = [f"任务：{self.user_request}"]
+        if self._history_context:
+            parts.append(f"\n\n（本会话上一任务的回顾：{self._history_context}）")
+        parts.append(f"\n\n初步计划：\n{plan_text or '（未生成）'}")
         return [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": (
-                    f"任务：{self.user_request}\n\n初步计划：\n{plan_text or '（未生成）'}"
-                ),
-            },
+            {"role": "user", "content": "".join(parts)},
         ]
 
     def _loop(self) -> None:

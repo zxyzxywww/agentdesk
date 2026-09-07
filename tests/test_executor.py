@@ -31,9 +31,11 @@ class ScriptedLLM:
         self.delay = delay
         self.stats = UsageStats()
         self.calls = 0
+        self.last_messages: list[dict] = []
 
     def chat(self, messages: list, **kwargs: object) -> ChatResult:
         self.calls += 1
+        self.last_messages = list(messages)
         self.stats.calls += 1
         self.stats.cost_yuan += self.cost_per_call
         if self.delay:
@@ -324,3 +326,33 @@ def test_parse_verdict_tolerant() -> None:
     assert parse(fenced) == ("pass", "")
     assert parse('好的评审如下："verdict":"rework","issues":"x"') == ("rework", "x")
     assert parse("评审完成，没问题") == ("pass", "")
+
+
+def test_session_memory_carries_previous_task(tmp_path: Path) -> None:
+    """同一会话内，第二个任务自动带上第一个任务的结论（会话短期记忆）。"""
+    runner1, _, db, _ = _make_env(
+        tmp_path, [_plan_response(), _text("完成：已整理出 3 个 csv，报告见 summary.xlsx")]
+    )
+    t1 = runner1.run()
+    assert t1.status == "done"
+    session_id = db.get_task(t1.id).session_id  # type: ignore[union-attr]
+
+    # 同会话第二个任务
+    t2 = db.create_task(session_id, "第二个任务")
+    llm2 = ScriptedLLM([_plan_response(), _text("第二个任务完成")])
+    runner2 = AgentRunner(
+        task_id=t2.id,
+        session_id=session_id,
+        user_request="第二个任务",
+        registry=runner1.registry,
+        llm=llm2,  # type: ignore[arg-type]
+        planner=Planner(llm2, settings=runner1.settings),  # type: ignore[arg-type]
+        db=db,
+        settings=runner1.settings,
+    )
+    task2 = runner2.run()
+    assert task2.status == "done"
+    # planner 之后主循环第一轮的 user 消息应含上一任务回顾
+    user_msg = next(m for m in llm2.last_messages if m["role"] == "user")
+    assert "回顾" in user_msg["content"]
+    assert "整理出 3 个 csv" in user_msg["content"]
