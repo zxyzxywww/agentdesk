@@ -255,6 +255,24 @@ class DB:
             rows = conn.execute("SELECT * FROM tasks ORDER BY created_at").fetchall()
         return [TaskRecord(**dict(r)) for r in rows]
 
+    def latest_done_task_in_workspace(self, workspace: str, exclude_session: str) -> TaskRecord | None:
+        """返回该工作区（除指定会话外）最近一条有结论的已完成任务；无则 None。
+
+        供跨会话记忆使用：同一 workspace 的新 session 可复用最近任务的结论。
+        """
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT t.* FROM tasks t
+                JOIN sessions s ON s.id = t.session_id
+                WHERE s.workspace = ? AND t.session_id != ?
+                  AND t.status IN ('done', 'stopped') AND trim(t.summary) != ''
+                ORDER BY t.updated_at DESC LIMIT 1
+                """,
+                (workspace, exclude_session),
+            ).fetchone()
+        return TaskRecord(**dict(row)) if row else None
+
     def update_task(
         self,
         task_id: str,
