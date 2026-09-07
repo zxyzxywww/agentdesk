@@ -71,23 +71,40 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 | 长任务中断 | UI 停止按钮 → `cancel()` |
 | 代码沙箱 | 子进程 + 工作目录限制 + 超时 + 输出截断（轻量，非强隔离，见边界） |
 
-### 工具清单（13）
+### 工具清单（17）
 
-`list_files` `read_file` `write_file` `move_file` `delete_file` `make_dir` ·
-`read_table` `merge_tables` `describe_table` · `run_python` ·
-`web_search` `fetch_page` `research_report`
+文件/目录 8：`list_files` `read_file` `write_file` `move_file` `delete_file` `make_dir` `organize_by_type` `count_files` ·
+表格 3：`read_table` `merge_tables` `describe_table` · 代码 1：`run_python` ·
+网页 3：`web_search` `fetch_page` `research_report` · 知识检索 1：`knowledge_search` ·
+规划 1：`update_plan`
 
 ## 测试与评估
 
 ```bash
-uv run pytest          # 93 个离线测试（全 mock，不依赖付费 API）
+uv run pytest          # 108 个离线测试（全 mock，不依赖付费 API）
 uv run ruff check .    # 零告警
 uv run mypy            # 零告警
-uv run python scripts/smoke.py   # 真实 LLM 冒烟任务（需 .env 配置）
+uv run python scripts/bench_reflection.py --tasks 5   # 真实 LLM 评测（需 .env 余额）
 ```
 
-评估指标（`src/agentdesk/core/eval.py`）：任务成功率、平均步数、平均成本——
-冒烟脚本执行后输出汇总，为简历量化成果提供真实数据。
+### 评测结果（真实模型实测：5 任务 × 反思开关，`deepseek-v4-flash-ga-260731`）
+
+评测方法：每个任务在独立临时工作目录完整执行两遍（反思关 `max_reflections=0` / 开 `=2`）；
+产出只认真实文件（写文件/归档/合并/统计）；危险操作由脚本模拟用户批准并计数（即 HITL 确认次数）。
+
+| 指标 | 反思关 | 反思开 |
+|---|---|---|
+| 任务完成率（done） | 5/5 | 5/5 |
+| 平均步数 | 7.0 | 8.8 |
+| 平均成本（元/任务） | 0.041 | 0.071 |
+| 工具调用成功率 | 45/45 (100%) | 42/44 (95%) |
+| 工具失败后任务仍完成（失败恢复） | 0 | 1 次（合并表格中 2 个工具失败，Agent 换策略完成） |
+| 人工确认次数（危险操作被拦截，HITL） | 2 | 6 |
+
+> 解读：反思开让 Agent 在收尾前多做评审与修正——多出的 1.8 步/0.03 元换来的是"产出经评审后才交付"，
+> 复杂任务（如合并表格）中工具偶发失败后 Agent 能换策略继续（失败恢复），而不是中断报错；
+> 需要人工确认的覆盖/删除操作全部被安全层拦截（开反思时模型更敢返工修改已有产物，确认次数 2→6）。
+> 复现：`uv run python scripts/bench_reflection.py --tasks N`（N×2 次完整执行，需账户余额；产出达标率按产物文件存在性判定）。
 
 ## 目录结构
 
