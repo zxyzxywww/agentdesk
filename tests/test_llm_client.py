@@ -79,16 +79,17 @@ def test_chat_parses_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_client_lazy_key_required(monkeypatch: pytest.MonkeyPatch) -> None:
     """无 key 时仅在首次真实调用报错（懒加载）。"""
-    monkeypatch.delenv("ARK_API_KEY", raising=False)
-    client = LLMClient(load_settings())
-    with pytest.raises(RuntimeError, match="ARK_API_KEY"):
+    settings = load_settings()
+    monkeypatch.delenv(settings.model.api_key_env, raising=False)
+    client = LLMClient(settings)
+    with pytest.raises(RuntimeError, match=settings.model.api_key_env):
         _ = client.client  # 触发懒加载
 
 
 def test_model_override() -> None:
     settings = load_settings()
     client = LLMClient(settings)
-    assert client.settings.model.chat_model == "deepseek-v4-flash-ga-260731"
+    assert client.settings.model.chat_model == settings.model.chat_model
     # 切换模型 = 换 settings 或传 model 参数；此处验证 settings 读取
     s2 = settings.model_copy(deep=True)
     s2.model.chat_model = "deepseek-reasoner"

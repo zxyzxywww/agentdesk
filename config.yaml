@@ -4,16 +4,16 @@
 # 2. 修改后重启服务生效；护栏参数用于控制成本与风险。
 
 model:
-  base_url: "https://ark.cn-beijing.volces.com/api/v3"  # OpenAI 兼容 API 地址（火山方舟）
-  chat_model: "deepseek-v4-flash-ga-260731"             # 方舟模型（模型名直连）
-  api_key_env: "ARK_API_KEY"                            # 从环境变量读取 API key（填在 .env）
+  base_url: "https://api.deepseek.com"        # OpenAI 兼容 API 地址（DeepSeek 官方）
+  chat_model: "deepseek-chat"                  # 官方对话模型（支持工具调用）
+  api_key_env: "DEEPSEEK_API_KEY"              # 从环境变量读取 API key（填在 .env）
   temperature: 0.2
   max_tokens: 4096
-# ── 切回 DeepSeek 官方（可切换）：把上面三行改回
-#    base_url: "https://api.deepseek.com"
-#    chat_model: "deepseek-chat"
-#    api_key_env: "DEEPSEEK_API_KEY"
-#    （.env 里需保留 DEEPSEEK_API_KEY）
+# ── 切回火山方舟（可切换）：把上面三行改回
+#    base_url: "https://ark.cn-beijing.volces.com/api/v3"
+#    chat_model: "deepseek-v4-flash-ga-260731"
+#    api_key_env: "ARK_API_KEY"
+#    （.env 里需保留 ARK_API_KEY；方舟按量计费、需账户有余额）
 
 agent:
   max_steps: 40            # 单任务最大工具调用步数（护栏；批量任务建议放宽）

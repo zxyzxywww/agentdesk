@@ -90,7 +90,7 @@ def test_status_and_static(client: TestClient) -> None:
     r = client.get("/api/status")
     assert r.status_code == 200
     data = r.json()
-    assert data["model"] == "deepseek-v4-flash-ga-260731"
+    assert data["model"] == load_settings().model.chat_model
     assert data["tool_count"] >= 13
     html = client.get("/")
     assert html.status_code == 200

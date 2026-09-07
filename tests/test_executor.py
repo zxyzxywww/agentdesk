@@ -354,5 +354,77 @@ def test_session_memory_carries_previous_task(tmp_path: Path) -> None:
     assert task2.status == "done"
     # planner 之后主循环第一轮的 user 消息应含上一任务回顾
     user_msg = next(m for m in llm2.last_messages if m["role"] == "user")
-    assert "回顾" in user_msg["content"]
+    assert "记忆·本会话上一任务" in user_msg["content"]
     assert "整理出 3 个 csv" in user_msg["content"]
+
+
+def test_workspace_memory_crosses_sessions(tmp_path: Path) -> None:
+    """跨会话记忆：新会话复用同工作区其他会话最近任务的结论，并标注来源。"""
+    runner1, _, db, _ = _make_env(
+        tmp_path, [_plan_response(), _text("完成：生成了 5 个分节文档")]
+    )
+    t1 = runner1.run()
+    assert t1.status == "done"
+    session_a = db.get_task(t1.id).session_id  # type: ignore[union-attr]
+
+    # 新会话 B：同一 workspace、不同 session
+    session_b = db.create_session("会话B", workspace=str(tmp_path))
+    t2 = db.create_task(session_b.id, "另一个任务")
+    llm2 = ScriptedLLM([_plan_response(), _text("任务完成")])
+    runner2 = AgentRunner(
+        task_id=t2.id,
+        session_id=session_b.id,
+        user_request="另一个任务",
+        registry=runner1.registry,
+        llm=llm2,  # type: ignore[arg-type]
+        planner=Planner(llm2, settings=runner1.settings),  # type: ignore[arg-type]
+        db=db,
+        settings=runner1.settings,
+    )
+    task2 = runner2.run()
+    assert task2.status == "done"
+    assert session_b.id != session_a
+    user_msg = next(m for m in llm2.last_messages if m["role"] == "user")
+    assert "记忆·本工作区其他会话" in user_msg["content"]
+    assert "生成了 5 个分节文档" in user_msg["content"]
+
+
+def test_multi_tool_calls_pause_completes_message_chain(tmp_path: Path) -> None:
+    """同一批两个工具调用：第一个触发确认时，第二个补"跳过"响应；
+    确认后消息链完整（每个 tool_call_id 都有 tool 响应，无占位残留）。"""
+    (tmp_path / "existing.txt").write_text("old", encoding="utf-8")
+    tc1 = _tool_call(
+        "write_file", json.dumps({"path": "existing.txt", "content": "new"}), cid="call_a"
+    )
+    tc2 = _tool_call("write_file", json.dumps({"path": "other.txt", "content": "x"}), cid="call_b")
+    # 把两个 tool_call 放进同一次响应
+    tc1.tool_calls = [*tc1.tool_calls, *tc2.tool_calls]  # type: ignore[operator]
+    runner, events, db, _ = _make_env(
+        tmp_path, [_plan_response(), tc1, _text("完成")]
+    )
+    with pytest.raises(AgentPaused):
+        runner.run()
+    call_id = [e for e in events if e.type == "needs_confirm"][0].data["call_id"]
+    final = runner.confirm(call_id)
+    assert final.status == "done"
+
+    def tool_ids(m: dict) -> list[str]:
+        return [c["id"] for c in (m.get("tool_calls") or [])]
+
+    # 每条 assistant 消息的 tool_calls 都必须有对应 tool 响应
+    for idx, m in enumerate(runner._messages):  # noqa: SLF001
+        ids = tool_ids(m)
+        if not ids:
+            continue
+        followed = [
+            t
+            for t in runner._messages[idx + 1 :]  # noqa: SLF001
+            if t.get("role") == "tool" and t.get("tool_call_id") in ids
+        ]
+        assert {f["tool_call_id"] for f in followed} == set(ids), f"缺响应: {ids}"
+    # 无占位残留
+    assert not any(
+        m.get("content") == "__PENDING_CONFIRM__" for m in runner._messages  # noqa: SLF001
+    )
+    # other.txt 被跳过：不应存在
+    assert not (tmp_path / "other.txt").exists()

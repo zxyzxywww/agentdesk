@@ -51,9 +51,12 @@ SYSTEM_PROMPT = """你是 AgentDesk，一个运行在用户本地数据目录中
 
 MAX_HISTORY_MESSAGES = 40
 
+# 待确认占位 tool 消息：确认/拒绝前先用它补全 assistant tool_calls 的响应，
+# 避免部分 provider（如 DeepSeek）因 tool_calls 缺少对应 tool 消息而报 400。
+_PENDING_PLACEHOLDER = "__PENDING_CONFIRM__"
+
 # 反思（自检）评审者提示词：检查最终产出是否真正完成任务，要求结构化输出便于解析
-REFLECT_PROMPT = (
-    "你是评审者。请检查执行者刚才的最终产出是否真正完成了用户任务，"
+REFLECT_PROMPT = (    "你是评审者。请检查执行者刚才的最终产出是否真正完成了用户任务，"
     '而不是只看它自己说"完成"。\n'
     "\n"
     "判断标准：\n"
@@ -124,6 +127,7 @@ class AgentRunner:
         self._stop_reason: str | None = None
         self._reflection_rounds = 0
         self._history_context = ""
+        self._history_source = ""
         self.final_summary = ""
 
     # ---------- 事件 ----------
@@ -153,11 +157,20 @@ class AgentRunner:
     def run(self) -> TaskRecord:
         """阻塞执行任务。需确认时抛 AgentPaused（任务状态 waiting_confirm）。"""
         self.db.update_task(self.task_id, status="running")
-        # 会话记忆：把本会话最近一次已完成任务的结论带给新任务（联系上下文）
+        # 会话记忆：本会话最近一次已完成任务的结论 → 降级为同工作区其他会话最近结论
+        self._history_source = ""
         for prev in reversed(self.db.list_tasks(self.session_id)):
             if prev.id != self.task_id and prev.status in ("done", "stopped") and prev.summary:
                 self._history_context = prev.summary[:400]
+                self._history_source = "本会话上一任务"
                 break
+        if not self._history_source:
+            sess = self.db.get_session(self.session_id)
+            if sess and sess.workspace:
+                other = self.db.latest_done_task_in_workspace(sess.workspace, self.session_id)
+                if other:
+                    self._history_context = other.summary[:400]
+                    self._history_source = f"本工作区其他会话({other.session_id[:8]})"
         self.db.add_message(self.session_id, "user", self.user_request)
         try:
             self._plan = self.planner.plan(self.user_request, self.registry.openai_schema())
@@ -184,6 +197,7 @@ class AgentRunner:
         if db_call_id != call_id:
             raise ValueError(f"call_id 不匹配: {call_id}")
         self._pending = None
+        self._drop_pending_placeholder()
         ctx = ToolContext(
             self.settings.workspace_root,
             self.settings,
@@ -208,6 +222,7 @@ class AgentRunner:
         if db_call_id != call_id:
             raise ValueError(f"call_id 不匹配: {call_id}")
         self._pending = None
+        self._drop_pending_placeholder()
         self.db.update_tool_call(
             call_id, result={"rejected": True, "operation": name}, status="failed"
         )
@@ -241,7 +256,7 @@ class AgentRunner:
         plan_text = "\n".join(f"{i + 1}. {s.goal}" for i, s in enumerate(self._plan))
         parts = [f"任务：{self.user_request}"]
         if self._history_context:
-            parts.append(f"\n\n（本会话上一任务的回顾：{self._history_context}）")
+            parts.append(f"\n\n（记忆·{self._history_source}的结论：{self._history_context}）")
         parts.append(f"\n\n初步计划：\n{plan_text or '（未生成）'}")
         return [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -273,7 +288,7 @@ class AgentRunner:
                     return
                 # 评审要求返工：进入下一轮循环，让模型按意见修正（可继续调工具）
                 continue
-            for seq, tc in enumerate(result.tool_calls, start=self._tool_steps + 1):
+            for i, tc in enumerate(result.tool_calls):
                 try:
                     args = json.loads(tc["arguments"]) if tc["arguments"] else {}
                     if not isinstance(args, dict):
@@ -291,7 +306,23 @@ class AgentRunner:
                     task_id=self.task_id,
                     update_plan=self._update_plan_from_tool,
                 )
-                self._execute_tool_call(tc["name"], args, seq, ctx, tc["id"])
+                try:
+                    self._execute_tool_call(
+                        tc["name"],
+                        args,
+                        self._tool_steps + i + 1,
+                        ctx,
+                        tc["id"],
+                    )
+                except AgentPaused:
+                    # 挂起等待确认：同一批里尚未执行的 tool_calls 需补响应，
+                    # 否则部分 provider 会因 tool_calls 缺对应 tool 消息报 400。
+                    for rest in result.tool_calls[i + 1 :]:
+                        self._append_tool_feedback(
+                            rest["id"],
+                            "[已跳过] 因前序操作挂起等待用户确认，本调用未执行。",
+                        )
+                    raise
 
     def _execute_tool_call(
         self,
@@ -316,6 +347,8 @@ class AgentRunner:
         except NeedsConfirmation as e:
             self.db.update_tool_call(call.id, status="waiting_confirm")
             self._pending = (name, args, seq, call.id, tool_call_id)
+            # 先补占位 tool 响应，保证该条 assistant 的 tool_calls 都有对应 tool 消息
+            self._append_tool_feedback(tool_call_id, _PENDING_PLACEHOLDER)
             self._emit(
                 "tool_end",
                 name=name,
@@ -372,6 +405,16 @@ class AgentRunner:
 
     def _append_tool_feedback(self, tool_call_id: str, content: str) -> None:
         self._messages.append({"role": "tool", "tool_call_id": tool_call_id, "content": content})
+
+    def _drop_pending_placeholder(self) -> None:
+        """移除待确认占位 tool 消息（确认/拒绝后会补真实响应）。"""
+        self._messages = [
+            m
+            for m in self._messages
+            if not (
+                m.get("role") == "tool" and m.get("content") == _PENDING_PLACEHOLDER
+            )
+        ]
 
     def _update_plan_from_tool(self, steps: list[str]) -> None:
         """工具 update_plan 的回调：执行中动态重排剩余计划（同步 DB 与 UI）。"""

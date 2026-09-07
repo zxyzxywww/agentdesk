@@ -9,8 +9,14 @@ from agentdesk.config import PROJECT_ROOT, load_settings
 
 def test_load_defaults_from_project_config() -> None:
     settings = load_settings()
-    assert settings.model.base_url == "https://ark.cn-beijing.volces.com/api/v3"
-    assert settings.model.chat_model == "deepseek-v4-flash-ga-260731"
+    # 与 config.yaml 中的当前模型配置保持一致（切换 provider 不影响本测试）
+    import yaml
+
+    from agentdesk.config import PROJECT_ROOT
+
+    raw = yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
+    assert settings.model.base_url == raw["model"]["base_url"]
+    assert settings.model.chat_model == raw["model"]["chat_model"]
     assert settings.agent.max_steps == 40
     assert settings.agent.max_repeated_actions == 3
     assert settings.search.provider in ("tavily", "fallback")
