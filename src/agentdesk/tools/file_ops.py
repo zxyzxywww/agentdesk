@@ -235,6 +235,37 @@ def _organize_by_type(args: dict, ctx: ToolContext) -> ToolResult:
     )
 
 
+class CountFilesParams(BaseModel):
+    """统计工作目录（或指定子目录）内文件数量与类型分布（只读，安全）。"""
+
+    directory: str = Field(
+        default="", description="要统计的子目录（相对工作目录），留空则统计工作目录根"
+    )
+
+
+def _count_files(args: dict, ctx: ToolContext) -> ToolResult:
+    if args["directory"]:
+        base = resolve_in_workspace(ctx.workspace_root, args["directory"])
+    else:
+        base = ctx.workspace_root
+    if not base.is_dir():
+        return ToolResult(summary=f"目录不存在: {args['directory'] or '(工作目录)'}")
+    counts: dict[str, int] = {}
+    total = 0
+    for p in base.rglob("*"):
+        if p.is_file():
+            total += 1
+            ext = p.suffix.lower() or "(无扩展名)"
+            counts[ext] = counts.get(ext, 0) + 1
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:15]
+    top_str = "、".join(f"{ext}: {n}" for ext, n in top)
+    summary = f"共 {total} 个文件（{len(counts)} 种类型，Top15: {top_str}）"
+    return ToolResult(
+        summary=summary,
+        data={"path": args["directory"] or ".", "total": total, "counts": counts},
+    )
+
+
 def build_file_tools() -> list[Tool]:
     """文件/目录工具集。"""
     return [
@@ -286,5 +317,11 @@ def build_file_tools() -> list[Tool]:
             ),
             parameters=OrganizeParams,
             func=_organize_by_type,
+        ),
+        Tool(
+            name="count_files",
+            description="统计工作目录（或子目录）内文件数量与类型分布（按扩展名分组，只读）",
+            parameters=CountFilesParams,
+            func=_count_files,
         ),
     ]

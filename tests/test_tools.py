@@ -37,6 +37,7 @@ def test_registry_contains_all_tools(reg: ToolRegistry) -> None:
         "delete_file",
         "make_dir",
         "organize_by_type",
+        "count_files",
         "read_table",
         "merge_tables",
         "describe_table",
@@ -116,6 +117,21 @@ def test_organize_by_type(reg: ToolRegistry, ctx: ToolContext) -> None:
     assert (ctx.workspace_root / "csv" / "a.csv").exists()
     assert (ctx.workspace_root / "text" / "b.txt").exists()
     assert (ctx.workspace_root / "docs" / "c.md").exists()
+
+
+def test_count_files(reg: ToolRegistry, ctx: ToolContext) -> None:
+    (ctx.workspace_root / "a.md").write_text("x", encoding="utf-8")
+    (ctx.workspace_root / "b.py").write_text("x", encoding="utf-8")
+    sub = ctx.workspace_root / "sub"
+    sub.mkdir()
+    (sub / "c.md").write_text("x", encoding="utf-8")
+    r = reg.execute("count_files", {"directory": ""}, ctx)
+    assert r.data["total"] == 3  # type: ignore[index]
+    assert r.data["counts"] == {".md": 2, ".py": 1}  # type: ignore[index]
+    assert "共 3 个文件" in r.summary
+    # 子目录定向统计
+    r2 = reg.execute("count_files", {"directory": "sub"}, ctx)
+    assert r2.data["total"] == 1  # type: ignore[index]
 
 
 def test_organize_by_type_idempotent(reg: ToolRegistry, ctx: ToolContext) -> None:
