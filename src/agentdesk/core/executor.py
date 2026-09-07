@@ -46,7 +46,8 @@ SYSTEM_PROMPT = """你是 AgentDesk，一个运行在用户本地数据目录中
 6. 每完成关键步骤尽量用 list_files / read_table 验证产出。
 7. 任务完成后，用一段话总结：做了什么、产出文件在哪、结果如何。
 8. 不要编造文件或结果；一切以工具返回为准。
-9. 回答需要引用本地既有文档/笔记/产出内容时，先调用 knowledge_search 检索真实内容再引用，禁止凭记忆编造来源。"""
+9. 引用本地文档/笔记内容前先调用 knowledge_search 检索，禁止凭记忆编造来源。
+10. 初始计划只是建议：发现需求变化或步骤不适用时可调用 update_plan 更新剩余计划。"""
 
 MAX_HISTORY_MESSAGES = 40
 
@@ -189,6 +190,7 @@ class AgentRunner:
             confirmed=True,
             db=self.db,
             task_id=self.task_id,
+            update_plan=self._update_plan_from_tool,
         )
         self._execute_tool_call(name, args, seq, ctx, tool_call_id, existing_call_id=db_call_id)
         try:
@@ -287,6 +289,7 @@ class AgentRunner:
                     confirmed=False,
                     db=self.db,
                     task_id=self.task_id,
+                    update_plan=self._update_plan_from_tool,
                 )
                 self._execute_tool_call(tc["name"], args, seq, ctx, tc["id"])
 
@@ -369,6 +372,16 @@ class AgentRunner:
 
     def _append_tool_feedback(self, tool_call_id: str, content: str) -> None:
         self._messages.append({"role": "tool", "tool_call_id": tool_call_id, "content": content})
+
+    def _update_plan_from_tool(self, steps: list[str]) -> None:
+        """工具 update_plan 的回调：执行中动态重排剩余计划（同步 DB 与 UI）。"""
+        cleaned = [s.strip() for s in steps if s and s.strip()]
+        self._plan = [PlanStep(goal=g) for g in cleaned[:20]]
+        plan_json = json.dumps(
+            [s.model_dump() for s in self._plan], ensure_ascii=False
+        )
+        self.db.update_task(self.task_id, plan_json=plan_json)
+        self._emit("plan", plan=[s.model_dump() for s in self._plan])
 
     # ---------- 反思（自检） ----------
 

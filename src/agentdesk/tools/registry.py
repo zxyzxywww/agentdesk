@@ -28,12 +28,14 @@ class ToolContext:
         confirmed: bool = False,
         db: Any = None,
         task_id: str | None = None,
+        update_plan: Any = None,
     ) -> None:
         self.workspace_root = workspace_root
         self.settings = settings
         self.confirmed = confirmed
         self.db = db
         self.task_id = task_id
+        self.update_plan = update_plan
         self._backup_mgr: Any = None
 
     def backup(self, path: Path, op: str = "overwrite") -> int | None:

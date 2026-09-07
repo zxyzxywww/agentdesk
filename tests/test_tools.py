@@ -39,6 +39,7 @@ def test_registry_contains_all_tools(reg: ToolRegistry) -> None:
         "organize_by_type",
         "count_files",
         "knowledge_search",
+        "update_plan",
         "read_table",
         "merge_tables",
         "describe_table",
@@ -234,3 +235,12 @@ def test_knowledge_search_hits_and_miss(reg: ToolRegistry, ctx: ToolContext) -> 
     # 未命中
     r2 = reg.execute("knowledge_search", {"keyword": "不存在的词"}, ctx)
     assert r2.data["total_matches"] == 0  # type: ignore[index]
+
+
+def test_update_plan_invokes_callback(reg: ToolRegistry, ctx: ToolContext) -> None:
+    """update_plan 工具把新步骤交给执行器回调（plan-and-execute 动态调整）。"""
+    received: list[list[str]] = []
+    ctx.update_plan = received.append  # type: ignore[method-assign]
+    r = reg.execute("update_plan", {"steps": ["先查资料", "再写报告"]}, ctx)
+    assert received == [["先查资料", "再写报告"]]
+    assert "已更新计划为 2 步" in r.summary
