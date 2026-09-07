@@ -38,6 +38,7 @@ def test_registry_contains_all_tools(reg: ToolRegistry) -> None:
         "make_dir",
         "organize_by_type",
         "count_files",
+        "knowledge_search",
         "read_table",
         "merge_tables",
         "describe_table",
@@ -216,3 +217,20 @@ def test_run_python_timeout(reg: ToolRegistry, ctx: ToolContext) -> None:
     ctx.confirmed = True
     r = reg.execute("run_python", {"code": "import time; time.sleep(30)", "timeout": 1}, ctx)
     assert "超时" in r.summary
+
+
+# ---------- 本地知识检索 ----------
+
+def test_knowledge_search_hits_and_miss(reg: ToolRegistry, ctx: ToolContext) -> None:
+    notes = ctx.workspace_root / "notes"
+    notes.mkdir()
+    (notes / "算法.md").write_text(
+        "本项目使用 BM25 检索算法。\n回退到关键词子串匹配。", encoding="utf-8"
+    )
+    (ctx.workspace_root / "其他.txt").write_text("无关内容。", encoding="utf-8")
+    r = reg.execute("knowledge_search", {"keyword": "bm25"}, ctx)
+    assert r.data["total_matches"] == 1  # type: ignore[index]
+    assert r.data["hits"][0]["file"] == str(Path("notes") / "算法.md")  # type: ignore[index]
+    # 未命中
+    r2 = reg.execute("knowledge_search", {"keyword": "不存在的词"}, ctx)
+    assert r2.data["total_matches"] == 0  # type: ignore[index]
