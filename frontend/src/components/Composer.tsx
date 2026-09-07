@@ -8,6 +8,11 @@ const TEMPLATES: { value: string; label: string }[] = [
   { value: "把工作目录下所有 csv 文件合并为一个 all.csv", label: "合并所有 csv" },
   { value: "把工作目录里的文件按类型归档到子文件夹", label: "按类型归档文件" },
   { value: "调研一下 LLM agent 框架的现状，写一份带引用来源的调研笔记", label: "网页调研：LLM agent 框架现状" },
+  {
+    value:
+      "请调研「医学影像 AI 去噪」方向的技术现状与临床落地趋势：先用 web_search 查至少 3 个不同来源，再逐篇 fetch 关键页面核实，最后把结论写成一份带小标题、要点和引用来源的调研报告 report.md（先查资料再动笔，完成后自查是否覆盖了：主流方法、代表论文/产品、临床落地情况三个要点）",
+    label: "业务调研：医影去噪技术现状报告(.md)",
+  },
 ];
 
 export function Composer({

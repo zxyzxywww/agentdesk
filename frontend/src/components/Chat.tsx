@@ -9,6 +9,20 @@ import { EmptyState } from "./EmptyState";
 
 function Bubble({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const kind = !isUser && message.content.startsWith("[反思]")
+    ? "reflect"
+    : !isUser && message.content.startsWith("[系统]")
+      ? "system"
+      : null;
+  const body = kind
+    ? message.content.replace(/^\[(反思|系统)\]\s*/, "")
+    : message.content;
+  const badge =
+    kind === "reflect"
+      ? { text: "反思自检", cls: "border-violet-500/40 bg-violet-500/10 text-violet-600" }
+      : kind === "system"
+        ? { text: "系统", cls: "border-slate-400/50 bg-slate-100 text-slate-500" }
+        : null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -21,9 +35,24 @@ function Bubble({ message }: { message: Message }) {
           {message.content}
         </div>
       ) : (
-        <div className="max-w-[78%] rounded-2xl rounded-bl-md border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm">
+        <div
+          className={cn(
+            "max-w-[78%] rounded-2xl rounded-bl-md border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm",
+            kind === "reflect" && "border-violet-500/30 bg-violet-500/[0.03]",
+          )}
+        >
+          {badge && (
+            <span
+              className={cn(
+                "mb-1.5 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide",
+                badge.cls,
+              )}
+            >
+              {kind === "reflect" ? "⟳" : "ⓘ"} {badge.text}
+            </span>
+          )}
           <div className="msg-md">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{body}</ReactMarkdown>
           </div>
         </div>
       )}
