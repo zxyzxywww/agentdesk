@@ -32,6 +32,7 @@ class AgentConfig(BaseModel):
     max_cost_yuan: float = 2.0
     max_repeated_actions: int = 3
     max_tool_output_chars: int = 4000
+    max_reflections: int = 2
 
 
 class WorkspaceConfig(BaseModel):

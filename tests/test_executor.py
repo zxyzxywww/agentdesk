@@ -76,6 +76,7 @@ def _make_env(
     max_steps: int | None = None,
     max_cost: float | None = None,
     max_repeated: int | None = None,
+    max_reflections: int | None = None,
 ) -> tuple[AgentRunner, list[AgentEvent], DB, Settings]:
     settings = load_settings()
     settings.workspace.root = str(tmp_path)  # 工具工作目录锁定在临时目录
@@ -86,6 +87,8 @@ def _make_env(
         settings.agent.max_cost_yuan = max_cost
     if max_repeated is not None:
         settings.agent.max_repeated_actions = max_repeated
+    if max_reflections is not None:
+        settings.agent.max_reflections = max_reflections
 
     db = DB(db_path=tmp_path / "test.db", settings=settings)
     session = db.create_session(workspace=str(tmp_path))
@@ -253,3 +256,71 @@ def test_cancel_guard(tmp_path: Path) -> None:
     task = result["task"]
     assert task.status == "stopped"
     assert "取消" in task.summary
+
+
+# ---------- 反思（自检） ----------
+
+def test_reflection_rework_then_pass(tmp_path: Path) -> None:
+    """评审发现遗漏→返工→再次产出通过评审→按修改版收尾。"""
+    runner, events, db, _ = _make_env(
+        tmp_path,
+        [
+            _plan_response(),  # 计划
+            _text("完成，已生成报告。"),  # 第一版产出
+            _text('{"verdict": "rework", "issues": "未实际写入文件，需真实产出报告文件"}'),  # 评审1：返工  # noqa: E501
+            _text("已补做：写入 report.md。"),  # 修改版
+            _text('{"verdict": "pass", "issues": ""}'),  # 评审2：通过
+        ],
+    )
+    task = runner.run()
+    assert task.status == "done"
+    assert task.summary == "已补做：写入 report.md。"
+    # 反思过程对用户可见（message 事件）
+    reflects = [
+        e.data.get("content", "")
+        for e in events
+        if e.type == "message" and "[反思]" in e.data.get("content", "")
+    ]
+    assert any("返工" in r and "未实际写入文件" in r for r in reflects)
+
+
+def test_reflection_pass_short_circuits(tmp_path: Path) -> None:
+    """评审通过时不追加返工指令，直接收尾。"""
+    runner, events, _, _ = _make_env(
+        tmp_path,
+        [
+            _plan_response(),
+            _text("任务完成。"),
+            _text('{"verdict": "pass", "issues": ""}'),
+        ],
+    )
+    task = runner.run()
+    assert task.status == "done"
+    assert task.summary == "任务完成。"
+    # 不应出现返工提示
+    reflects = [
+        e.data.get("content", "")
+        for e in events
+        if e.type == "message" and "[反思]" in e.data.get("content", "")
+    ]
+    assert reflects == []
+
+
+def test_reflection_disabled_when_zero(tmp_path: Path) -> None:
+    """max_reflections=0 时不做评审调用（llm.calls 只含 planner + 主循环各 1 次）。"""
+    runner, _, _, settings = _make_env(
+        tmp_path, [_plan_response(), _text("直接完成。")], max_reflections=0
+    )
+    assert settings.agent.max_reflections == 0
+    task = runner.run()
+    assert task.status == "done"
+
+
+def test_parse_verdict_tolerant() -> None:
+    """verdict 解析容错：裸 JSON / 代码块包裹 / 正则兜底 / 垃圾输入按 pass。"""
+    parse = AgentRunner._parse_verdict
+    assert parse('{"verdict": "rework", "issues": "缺文件"}') == ("rework", "缺文件")
+    fenced = "```json\n" + '{"verdict": "pass", "issues": ""}' + "\n```"
+    assert parse(fenced) == ("pass", "")
+    assert parse('好的评审如下："verdict":"rework","issues":"x"') == ("rework", "x")
+    assert parse("评审完成，没问题") == ("pass", "")

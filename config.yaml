@@ -20,6 +20,7 @@ agent:
   max_cost_yuan: 2.0       # 单任务最大成本（护栏，元）
   max_repeated_actions: 3  # 相同动作连续重复次数上限（护栏）
   max_tool_output_chars: 4000  # 单次工具结果回填给模型的最大字符数
+  max_reflections: 2           # 产出后自检(反思)轮数上限；0=关闭自检（每轮多一次评审调用）
 
 workspace:
   root: "data/workspace"   # 默认工作目录（相对项目根；所有文件操作被锁定在此目录内）

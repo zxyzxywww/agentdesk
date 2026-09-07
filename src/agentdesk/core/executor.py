@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -47,6 +48,21 @@ SYSTEM_PROMPT = """你是 AgentDesk，一个运行在用户本地数据目录中
 8. 不要编造文件或结果；一切以工具返回为准。"""
 
 MAX_HISTORY_MESSAGES = 40
+
+# 反思（自检）评审者提示词：检查最终产出是否真正完成任务，要求结构化输出便于解析
+REFLECT_PROMPT = (
+    "你是评审者。请检查执行者刚才的最终产出是否真正完成了用户任务，"
+    '而不是只看它自己说"完成"。\n'
+    "\n"
+    "判断标准：\n"
+    "1. 任务的每个要求是否都被满足（多个文件/指定格式/指定输出位置等），有无遗漏；\n"
+    "2. 产出是否基于工具的真实返回（有没有编造文件、数据或来源）；\n"
+    "3. 有无明显硬伤或低成本即可修正的错误。\n"
+    "\n"
+    "请只输出一个 JSON 对象（不要输出其它文字），格式：\n"
+    '{"verdict": "pass 或 rework", "issues": "rework 时用一句话说明最关键的问题；'
+    'pass 时为空字符串"}'
+)
 
 
 class AgentPaused(Exception):
@@ -104,6 +120,7 @@ class AgentRunner:
         self._pending: tuple[str, dict, int, int, str] | None = None
         self._plan: list[PlanStep] = []
         self._stop_reason: str | None = None
+        self._reflection_rounds = 0
         self.final_summary = ""
 
     # ---------- 事件 ----------
@@ -242,9 +259,12 @@ class AgentRunner:
                 }
             )
             if not result.tool_calls:
-                self.final_summary = result.content or "任务完成"
-                self._emit("message", content=self.final_summary)
-                return
+                if self._maybe_reflect():
+                    self.final_summary = result.content or "任务完成"
+                    self._emit("message", content=self.final_summary)
+                    return
+                # 评审要求返工：进入下一轮循环，让模型按意见修正（可继续调工具）
+                continue
             for seq, tc in enumerate(result.tool_calls, start=self._tool_steps + 1):
                 try:
                     args = json.loads(tc["arguments"]) if tc["arguments"] else {}
@@ -343,6 +363,62 @@ class AgentRunner:
 
     def _append_tool_feedback(self, tool_call_id: str, content: str) -> None:
         self._messages.append({"role": "tool", "tool_call_id": tool_call_id, "content": content})
+
+    # ---------- 反思（自检） ----------
+
+    def _maybe_reflect(self) -> bool:
+        """模型给出最终产出后做一轮自检。
+
+        返回 True=直接收尾（评审通过 / 无法评审 / 已达反思上限）；
+        返回 False=评审发现问题，已把返工意见注入对话，应继续循环。
+        """
+        max_rounds = self.settings.agent.max_reflections
+        if max_rounds <= 0 or self._reflection_rounds >= max_rounds:
+            return True
+        self._reflection_rounds += 1
+        try:
+            judge = self.llm.chat(
+                messages=self._trimmed() + [{"role": "user", "content": REFLECT_PROMPT}],
+                tools=[],
+            )
+        except Exception:  # noqa: BLE001 - 评审故障不影响任务本身：保守收尾
+            return True
+        verdict, issues = self._parse_verdict(judge.content or "")
+        if verdict != "rework":
+            return True
+        if not issues:
+            return True
+        self._emit("message", content=f"[反思] 自检发现问题，要求返工：{issues}")
+        self._messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "你是执行者。评审者对你刚才的产出提出如下问题：\n"
+                    f"问题：{issues}\n"
+                    "请针对问题修正（可继续调用工具核实/补做，不要只复述结论），"
+                    "修正完成后给出最终总结。"
+                ),
+            }
+        )
+        return False
+
+    @staticmethod
+    def _parse_verdict(text: str) -> tuple[str, str]:
+        """从评审输出中解析 (verdict, issues)；容错：剥代码块、正则兜底、失败按 pass。"""
+        cleaned = text.strip()
+        m = re.search(r"```(?:json)?\s*(.*?)```", cleaned, re.DOTALL)
+        if m:
+            cleaned = m.group(1).strip()
+        try:
+            obj = json.loads(cleaned)
+            return str(obj.get("verdict", "pass")), str(obj.get("issues", ""))
+        except (json.JSONDecodeError, AttributeError):
+            m = re.search(r'"verdict"\s*:\s*"(pass|rework)"', cleaned)
+            if m:
+                issues_m = re.search(r'"issues"\s*:\s*"((?:[^"\\]|\\.)*)"', cleaned)
+                issues = issues_m.group(1) if issues_m else ""
+                return m.group(1), issues
+            return "pass", ""
 
     def _finish(self, status: str) -> TaskRecord:
         summary = (
