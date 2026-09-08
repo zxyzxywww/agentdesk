@@ -31,17 +31,16 @@ function Bubble({ message }: { message: Message }) {
       className={cn("flex", isUser ? "justify-end" : "justify-start")}
     >
       {isUser ? (
-        <div className="max-w-[62%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">
+        <div className="max-w-[78%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm leading-relaxed text-primary-foreground shadow-sm">
           {message.content}
         </div>
       ) : (
         <div
           className={cn(
-            "max-w-full text-[15px] leading-relaxed",
-            kind === "reflect" &&
-              "max-w-[min(92%,860px)] rounded-2xl border border-violet-500/25 bg-violet-500/[0.04] px-4 py-2.5",
-            kind === "system" &&
-              "max-w-[min(92%,860px)] rounded-2xl bg-secondary/60 px-4 py-2.5",
+            "max-w-[90%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed md:max-w-[820px]",
+            kind === "reflect" && "border border-violet-500/25 bg-violet-500/[0.04]",
+            kind === "system" && "bg-secondary/50",
+            !kind && "bg-card/60",
           )}
         >
           {badge && (
