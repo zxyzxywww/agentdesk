@@ -244,3 +244,20 @@ def test_update_plan_invokes_callback(reg: ToolRegistry, ctx: ToolContext) -> No
     r = reg.execute("update_plan", {"steps": ["先查资料", "再写报告"]}, ctx)
     assert received == [["先查资料", "再写报告"]]
     assert "已更新计划为 2 步" in r.summary
+
+
+def test_organize_protects_db_and_hidden_files(reg: ToolRegistry, ctx: ToolContext) -> None:
+    """归档不能卷走数据库/隐藏文件（否则任务状态库会被移走导致崩溃）。"""
+    (ctx.workspace_root / "data.db").write_text("sqlite", encoding="utf-8")
+    (ctx.workspace_root / "app.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+    (ctx.workspace_root / ".env.local").write_text("secret", encoding="utf-8")
+    # 自定义 mapping 也不能覆盖黑名单（防止模型把状态库归档到 database/）
+    r = reg.execute(
+        "organize_by_type",
+        {"directory": ".", "mapping": {"db": "database", "csv": "data"}},
+        ctx,
+    )
+    assert (ctx.workspace_root / "data.db").exists(), ".db 不应被移动"
+    assert (ctx.workspace_root / ".env.local").exists(), "隐藏文件不应被移动"
+    assert (ctx.workspace_root / "data" / "app.csv").exists(), "csv 自定义映射仍应生效"
+    assert r.data["moved"] == 1  # type: ignore[index]

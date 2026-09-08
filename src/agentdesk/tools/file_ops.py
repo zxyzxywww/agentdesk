@@ -203,14 +203,19 @@ def _organize_by_type(args: dict, ctx: ToolContext) -> ToolResult:
     base = resolve_in_workspace(ctx.workspace_root, args["directory"])
     if not base.is_dir():
         return ToolResult(summary=f"目录不存在: {args['directory']}")
+    # 黑名单：数据库/临时/密钥文件永不参与归档（即使自定义 mapping 也不能覆盖），
+    # 避免 Agent 把 sqlite/.env 等状态或密钥文件卷进归档目录
+    BLACKLIST_EXTS = {".db", ".sqlite", ".sqlite3", ".tmp", ".lock", ".env"}
     mapping = {k.lower().lstrip("."): v for k, v in (args.get("mapping") or {}).items()}
     moved = 0
     skipped = 0
     folders: set[str] = set()
     for child in sorted(base.iterdir()):
-        if child.is_dir():
+        if child.is_dir() or child.name.startswith("."):
             continue
         ext = child.suffix.lower()
+        if ext in BLACKLIST_EXTS:
+            continue
         folder = mapping.get(ext.lstrip(".")) or DEFAULT_TYPE_DIRS.get(ext, "misc")
         dest_dir = base / folder
         dest_dir.mkdir(parents=True, exist_ok=True)

@@ -50,7 +50,7 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 │ Planner（任务→步骤计划）→ ReAct 执行循环 → 护栏 → 任务验收     │
 │ 事件：plan / tool_start / tool_end / needs_confirm / done │
 └───────────────┬───────────────────────────────────────┘
-┌─ 工具层（agentdesk/tools，13 个工具，Pydantic 参数校验）─────┐
+┌─ 工具层（agentdesk/tools，17 个工具，Pydantic 参数校验）─────┐
 │ 文件操作 6 · 表格处理 3 · 代码执行 1 · 网页调研 3              │
 └───────────────┬───────────────────────────────────────┘
 ┌─ 存储（agentdesk/storage）───────────────────────────────┐
@@ -81,7 +81,7 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 ## 测试与评估
 
 ```bash
-uv run pytest          # 108 个离线测试（全 mock，不依赖付费 API）
+uv run pytest          # 110 个离线测试（全 mock，不依赖付费 API）
 uv run ruff check .    # 零告警
 uv run mypy            # 零告警
 uv run python scripts/bench_reflection.py --tasks 5   # 真实 LLM 评测（需 .env 余额）
@@ -116,7 +116,7 @@ agentdesk/
 ├── src/agentdesk/
 │   ├── config.py          # 配置加载（Pydantic + yaml + dotenv）
 │   ├── core/              # planner / executor / summary / export / eval
-│   ├── tools/             # registry + file_ops/data_ops/code_runner/web_research
+│   ├── tools/             # registry + file_ops/data_ops/code_runner/web_research/knowledge/planning
 │   ├── llm/               # OpenAI 兼容客户端（token/成本统计）
 │   ├── storage/           # SQLite + 备份回滚
 │   └── ui/                # FastAPI（API/WS/托管 frontend/dist）
@@ -124,8 +124,8 @@ agentdesk/
 │   ├── src/               # 组件与 hooks（App/TopBar/Chat/Panels/…）
 │   └── dist/              # 构建产物（.gitignore，由 FastAPI 托管）
 ├── scripts/smoke.py       # 真实冒烟任务
-├── tests/                 # 93 个离线测试
-└── docs/                  # 设计文档 / 简历素材 / 面试深挖 / Demo 脚本
+├── tests/                 # 110 个离线测试
+└── docs/                  # 设计文档 / 简历素材 / 录屏脚本 / 业务演示任务卡
 ```
 
 ## 技术栈
