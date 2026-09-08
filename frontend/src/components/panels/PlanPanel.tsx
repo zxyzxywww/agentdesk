@@ -1,7 +1,17 @@
 import type { PlanStep } from "@/lib/types";
 import { Badge } from "../ui/badge";
 
-export function PlanPanel({ plan }: { plan: PlanStep[] }) {
+export function PlanPanel({
+  plan,
+  doneCount = 0,
+  revisions = 0,
+}: {
+  plan: PlanStep[];
+  /** 已完成的工具调用数（近似当前进度） */
+  doneCount?: number;
+  /** 计划被 update_plan 动态调整的次数 */
+  revisions?: number;
+}) {
   if (plan.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-xs text-muted-foreground">
@@ -10,7 +20,17 @@ export function PlanPanel({ plan }: { plan: PlanStep[] }) {
     );
   }
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5 px-0.5 text-[11px] text-muted-foreground">
+        <span>
+          已完成 {Math.min(doneCount, plan.length)}/{plan.length} 步
+        </span>
+        {revisions > 0 && (
+          <Badge variant="secondary" className="ml-auto text-[9px]">
+            ⟳ 已调整 {revisions} 次
+          </Badge>
+        )}
+      </div>
       {plan.map((s, i) => (
         <div
           key={i}
