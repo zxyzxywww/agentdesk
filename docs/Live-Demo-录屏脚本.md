@@ -10,7 +10,7 @@
 uv sync
 # 复制 .env.example 为 .env，填入 DEEPSEEK_API_KEY（建议再填 TAVILY_API_KEY）
 # 启动服务
-uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 8000
+uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 8001
 ```
 
 在 `data/workspace/` 放几个真实感文件（演示更有说服力）：
@@ -20,7 +20,7 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 
 ## 1. 开场（约 20 秒）
 
-- 打开 `http://127.0.0.1:8000`，深色工作台
+- 打开 `http://127.0.0.1:8001`，深色工作台
 - 口播：**「这是 AgentDesk，一个通用任务型 Agent 工作台。它能把自然语言任务拆成计划，
   调用工具完成文件与数据处理，还能做网页调研；整个过程每一步都看得见、可干预。」**
 - 镜头停留顶部栏：模型（deepseek-chat）、工作目录、累计成本。

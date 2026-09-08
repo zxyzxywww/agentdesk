@@ -4,7 +4,7 @@ services:
   agentdesk:
     build: .
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}

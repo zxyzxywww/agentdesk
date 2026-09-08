@@ -28,9 +28,9 @@ uv sync
 Copy-Item .env.example .env   # Windows PowerShell
 
 # 3. 启动工作台
-uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 8000
+uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 8001
 
-# 4. 浏览器打开 http://127.0.0.1:8000
+# 4. 浏览器打开 http://127.0.0.1:8001
 ```
 
 > 没有 TAVILY_API_KEY 也能跑：`config.yaml` 里 `search.provider` 设为 `fallback`
@@ -133,7 +133,7 @@ agentdesk/
 后端：Python 3.12 · FastAPI + WebSocket · OpenAI 兼容 API（DeepSeek）·
 Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / mypy · uv · Docker
 前端：Vite + React + TypeScript + Tailwind CSS + shadcn/ui 风格组件 + Motion 动效
-（构建产物由 FastAPI 直接托管，单服务单端口；开发模式 `npm run dev` 代理到 8000）
+（构建产物由 FastAPI 直接托管，单服务单端口；开发模式 `npm run dev` 代理到 8001）
 
 ## 诚实边界（README 如实披露）
 
