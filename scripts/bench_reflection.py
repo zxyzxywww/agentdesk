@@ -103,6 +103,35 @@ def build_cases():
          ],
          lambda ws: _nonempty(ws, "cleanup_report.md")
          and not all(_exists(ws, n) for n in ("alpha.csv", "beta.txt", "gamma.log"))),
+        # 9. 多约束审计报告（易遗漏项 → 反思返工最可能触发的场景）
+        ("审计报告多约束",
+         "检查当前目录所有文件，生成 audit.md 审计报告。报告必须包含四个小节"
+         "（依次为：## 文件统计 / ## 问题清单 / ## 整理建议 / ## 结论）："
+         "文件统计要写全每类文件数量；问题清单必须列出至少 3 个具体问题；"
+         "整理建议要按优先级排序。写完后对照要求自查：四节是否齐全、问题是否够 3 个，"
+         "不齐就补充后再交付。",
+         lambda ws: [
+             (ws / "data.csv").write_text("id,value\n1,10\n1,10\n2,20\n", encoding="utf-8"),
+             (ws / "notes.txt").write_text("随手记录，无日期无作者。\n", encoding="utf-8"),
+             (ws / "old.log").write_text("no timestamp line\nsecond line\n", encoding="utf-8"),
+         ],
+         lambda ws: _nonempty(ws, "audit.md")
+         and all(k in (ws / "audit.md").read_text(encoding="utf-8")
+                 for k in ("文件统计", "问题清单", "整理建议"))),
+        # 10. 清单逐条核对（要求不漏项不合并）
+        ("清单逐条核对",
+         "当前目录的 spec.md 列出 5 条验收要求。请逐条检查并写 result.md："
+         "每条要求分别给『达成』或『未达成』并附一句依据，5 条必须逐条列出、不得遗漏或合并。",
+         lambda ws: [
+             (ws / "spec.md").write_text(
+                 "1. 存在 report.md\n2. report.md 内含'结论'\n"
+                 "3. 存在 data.csv\n4. data.csv 至少 2 行\n5. 存在 notes.txt\n",
+                 encoding="utf-8"),
+             (ws / "report.md").write_text("# r\n\n结论：ok\n", encoding="utf-8"),
+             (ws / "data.csv").write_text("a,b\n1,2\n", encoding="utf-8"),
+         ],
+         lambda ws: _nonempty(ws, "result.md")
+         and "达成" in (ws / "result.md").read_text(encoding="utf-8")),
     ]
 
 
@@ -199,6 +228,7 @@ def _stat(rows: list[dict]) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", type=int, default=8)
+    ap.add_argument("--skip", type=int, default=0, help="跳过前 N 个任务（与 --tasks 配合切片）")
     ap.add_argument("--repeat", type=int, default=1, help="每条件重复次数（默认 1）")
     ap.add_argument(
         "--out", default=None,
@@ -227,7 +257,7 @@ def main() -> None:
         sys.stdout = _Tee(sys.stdout, open(args.out, "w", encoding="utf-8", newline="\n"))
     load_dotenv(PROJECT_ROOT / ".env", override=True)
     settings = load_settings()
-    cases = build_cases()[: args.tasks]
+    cases = build_cases()[args.skip : args.tasks]
     total = len(cases) * 2 * args.repeat
     print(
         f"评测 {len(cases)} 任务 × 2 条件 × {args.repeat} 重复 = {total} 次执行 "
