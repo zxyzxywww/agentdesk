@@ -45,14 +45,14 @@ export function TopBar({
       </div>
 
       <div
-        className="ml-2 hidden items-center gap-1.5 text-[11px] text-muted-foreground xl:flex"
-        title="模型 · 搜索服务 · 工作目录"
+        className="ml-2 hidden min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground xl:flex"
+        title={`模型 · 搜索服务 · 工作目录\n${status?.workspace ?? ""}`}
       >
         <span className="font-mono whitespace-nowrap">{status?.model ?? "…"}</span>
-        <span className="opacity-50">·</span>
+        <span className="shrink-0 opacity-50">·</span>
         <span className="font-mono whitespace-nowrap">{status?.search_provider ?? "…"}</span>
-        <span className="opacity-50">·</span>
-        <span className="break-all">{status?.workspace}</span>
+        <span className="shrink-0 opacity-50">·</span>
+        <span className="max-w-[34ch] truncate font-mono">{status?.workspace}</span>
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">

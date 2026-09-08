@@ -19,6 +19,7 @@ export function RightPanel({
   refreshKey,
   toolCards,
   plan,
+  planRevisions,
   accept,
   backups,
   onRestore,
@@ -28,6 +29,7 @@ export function RightPanel({
   refreshKey: number;
   toolCards: ToolCardData[];
   plan: PlanStep[];
+  planRevisions: number;
   accept: TaskResult | null;
   backups: BackupRecord[];
   onRestore: (id: number) => void;
@@ -41,10 +43,10 @@ export function RightPanel({
   };
 
   return (
-    <aside className="flex h-full w-full shrink-0 flex-col border-l bg-card/40">
-      <div className="px-3 pt-3">
+    <aside className="flex h-full w-full shrink-0 flex-col border-l bg-card/30">
+      <div className="px-3.5 pt-3.5">
         <Tabs value={tab} onValueChange={(v) => onTabChange(v as PanelTab)}>
-          <TabsList>
+          <TabsList className="rounded-xl bg-secondary/80">
             {PANEL_TABS.map((t) => (
               <TabsTrigger key={t} value={t}>
                 {labels[t]}
@@ -53,16 +55,20 @@ export function RightPanel({
           </TabsList>
         </Tabs>
       </div>
-      <div className="mt-1 flex-1 overflow-y-auto px-3 pb-3">
+      <div className="mt-2 flex-1 overflow-y-auto px-3.5 pb-4">
         <Tabs value={tab} onValueChange={(v) => onTabChange(v as PanelTab)}>
           <TabsContent value="run">
             <ToolLog cards={toolCards} />
           </TabsContent>
           <TabsContent value="plan">
-            <PlanPanel plan={plan} />
+            <PlanPanel
+              plan={plan}
+              doneCount={toolCards.filter((c) => c.status === "success" || c.status === "failed").length}
+              revisions={planRevisions}
+            />
           </TabsContent>
           <TabsContent value="files">
-            <FilePanel refreshKey={refreshKey} />
+            <FilePanel refreshKey={refreshKey} outputFiles={accept?.files ?? []} />
           </TabsContent>
           <TabsContent value="accept">
             <AcceptPanel result={accept} />

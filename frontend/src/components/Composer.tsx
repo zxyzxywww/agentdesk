@@ -47,11 +47,14 @@ export function Composer({
         className="absolute -top-1.5 left-0 right-0 h-1.5 cursor-row-resize transition-colors hover:bg-primary/40"
         title="拖拽调整输入区高度"
       />
-      <div className="flex h-full flex-col p-3">
-        <div className="mb-2 flex items-center gap-2">
+      <div className="flex h-full flex-col p-3.5">
+        <div className="mb-2.5 flex items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            快捷模板
+          </span>
           <Select value={template} onValueChange={(v) => { setTemplate(v); setText(v); }}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="快捷任务模板…" />
+            <SelectTrigger className="h-7 w-48 text-xs">
+              <SelectValue placeholder="选择一个试试…" />
             </SelectTrigger>
             <SelectContent>
               {TEMPLATES.map((t) => (
@@ -61,19 +64,21 @@ export function Composer({
               ))}
             </SelectContent>
           </Select>
-          <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">
-            {running ? "任务执行中…" : "删除 / 覆盖前会先确认，执行前自动备份可撤销"}
+          <span className="ml-auto hidden whitespace-nowrap text-[11px] text-muted-foreground/80 sm:block">
+            危险操作先确认 · 覆盖前自动备份可撤销
           </span>
-          <Button size="sm" variant="destructive" disabled={!running} onClick={onStop}>
-            <Square className="size-3.5" />
-            停止
-          </Button>
+          {running && (
+            <Button size="sm" variant="destructive" onClick={onStop}>
+              <Square className="size-3.5" />
+              停止
+            </Button>
+          )}
         </div>
 
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="min-h-0 flex-1 resize-none"
+          className="min-h-0 flex-1 resize-none text-[15px] leading-relaxed"
           placeholder="下达任务，例如：把工作目录下所有 csv 合并为一个 all.csv · Enter 发送，Shift+Enter 换行"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -83,8 +88,13 @@ export function Composer({
           }}
         />
 
-        <div className="mt-2 flex justify-end">
-          <Button onClick={submit} disabled={running || !text.trim()}>
+        <div className="mt-2.5 flex items-center justify-end gap-2">
+          {!running && text.trim() && (
+            <span className="mr-auto text-[11px] text-muted-foreground">
+              将交给 Agent 自主规划与执行
+            </span>
+          )}
+          <Button onClick={submit} disabled={running || !text.trim()} className="h-9 px-5 shadow-sm">
             <Play className="size-4" />
             运行任务
           </Button>

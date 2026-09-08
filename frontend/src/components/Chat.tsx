@@ -37,8 +37,10 @@ function Bubble({ message }: { message: Message }) {
       ) : (
         <div
           className={cn(
-            "max-w-[78%] rounded-2xl rounded-bl-md border bg-card px-4 py-2.5 text-sm leading-relaxed text-foreground shadow-sm",
-            kind === "reflect" && "border-violet-500/30 bg-violet-500/[0.03]",
+            "max-w-[90%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed md:max-w-[820px]",
+            kind === "reflect" && "border border-violet-500/25 bg-violet-500/[0.04]",
+            kind === "system" && "bg-secondary/50",
+            !kind && "bg-card/60",
           )}
         >
           {badge && (
@@ -83,7 +85,7 @@ export function Chat({ messages }: { messages: Message[] }) {
           }
         />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4 px-1">
           {messages.map((m) => (
             <Bubble key={m.id} message={m} />
           ))}
