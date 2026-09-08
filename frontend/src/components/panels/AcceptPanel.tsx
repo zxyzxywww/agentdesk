@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, ChevronRight, Coins, FileText, ListChecks, Timer, Wrench } from "lucide-react";
+import { CheckCircle2, ChevronRight, FileText, ListChecks, Timer } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Td, THead, Table, TBody, Th, Tr } from "../ui/table";
 import { fmtCost } from "@/lib/utils";
@@ -44,67 +44,34 @@ export function AcceptPanel({ result }: { result: TaskResult | null }) {
     );
   }
   const badge = STATUS_BADGE[result.status] ?? "secondary";
-  const done = result.status === "done";
-  const icon = done ? (
-    <CheckCircle2 className="size-5 text-success" />
-  ) : result.status === "failed" ? (
-    <AlertCircle className="size-5 text-destructive" />
-  ) : (
-    <Timer className="size-5 text-warning" />
-  );
 
   return (
-    <div className="flex flex-col gap-3.5">
-      {/* 完成状态横幅 */}
-      <div className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 ring-1 ring-border/60">
-        {icon}
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">
-            {done ? "任务完成" : result.status === "failed" ? "任务失败" : "任务未完成"}
-          </div>
-          <div className="text-[11px] text-muted-foreground">
-            {done ? "Agent 已交付最终结果，产出可点击查看" : `状态：${result.status}`}
-          </div>
-        </div>
-        <Badge variant={badge} className="ml-auto shrink-0 uppercase">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Badge variant={badge} className="uppercase">
           {result.status}
         </Badge>
+        <span className="ml-auto flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+          <Timer className="size-3" />
+          {result.steps} 步 · {fmtCost(result.cost_yuan)}
+        </span>
       </div>
 
-      {/* 指标：步数 / 成本 / 工具数 */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: "步数", value: String(result.steps), icon: <Timer className="size-3.5" /> },
-          { label: "成本", value: fmtCost(result.cost_yuan), icon: <Coins className="size-3.5" /> },
-          { label: "工具调用", value: String(result.tool_calls.length), icon: <Wrench className="size-3.5" /> },
-        ].map((m) => (
-          <div key={m.label} className="flex flex-col gap-0.5 rounded-xl bg-card px-3 py-2.5 ring-1 ring-border/60">
-            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              {m.icon}
-              {m.label}
-            </span>
-            <span className="font-mono text-sm font-semibold text-foreground">{m.value}</span>
-          </div>
-        ))}
+      <div className="rounded-lg border bg-card p-3 text-sm leading-relaxed">
+        {result.summary}
       </div>
-
-      {result.summary && (
-        <div className="rounded-2xl bg-card/60 px-4 py-3 text-sm leading-relaxed text-foreground">
-          {result.summary}
-        </div>
-      )}
 
       {result.files.length > 0 && (
         <div>
-          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <FileText className="size-3.5" />
-            实际产出文件
+            产出文件
           </div>
           <div className="flex flex-wrap gap-1.5">
             {result.files.map((f) => (
               <code
                 key={f}
-                className="rounded-lg bg-success/10 px-2 py-1 font-mono text-[11px] text-foreground ring-1 ring-success/20"
+                className="rounded-md bg-secondary px-2 py-1 font-mono text-[11px] text-foreground"
               >
                 {f}
               </code>

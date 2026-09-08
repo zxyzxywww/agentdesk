@@ -9,14 +9,7 @@ import type { WorkspaceEntry } from "@/lib/types";
  * 工作目录文件浏览器：自管加载，支持点击文件夹进入子目录、返回上一层。
  * refreshKey 变化时（任务完成/切换会话）重载当前路径。
  */
-export function FilePanel({
-  refreshKey,
-  outputFiles = [],
-}: {
-  refreshKey: number;
-  /** 本任务实际产出的文件（相对工作区），用于高亮区分 */
-  outputFiles?: string[];
-}) {
+export function FilePanel({ refreshKey }: { refreshKey: number }) {
   const [path, setPath] = useState(".");
   const [entries, setEntries] = useState<WorkspaceEntry[]>([]);
   const [hist, setHist] = useState<string[]>([]);
@@ -129,38 +122,29 @@ export function FilePanel({
             拖拽文件上来，或让 Agent 去创建
           </div>
         ) : (
-          entries.map((f) => {
-            const isOutput = f.type === "file" && outputFiles.includes(f.name);
-            return (
-              <div
-                key={f.name}
-                data-entry={f.type}
-                onClick={() => f.type === "dir" && enterDir(f.name)}
-                className={cn(
-                  "group flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors",
-                  f.type === "dir"
-                    ? "cursor-pointer hover:bg-secondary/70"
-                    : "hover:bg-secondary/50",
-                  isOutput && "bg-success/[0.06] ring-1 ring-success/20"
-                )}
-              >
-                {f.type === "dir" ? (
-                  <Folder className="size-3.5 shrink-0 text-muted-foreground/70" />
-                ) : (
-                  <FileIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
-                )}
-                <span className="truncate font-mono">{f.name}</span>
-                {isOutput && (
-                  <span className="rounded-full bg-success/15 px-1.5 py-px text-[9px] font-medium text-success">
-                    产出
-                  </span>
-                )}
-                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
-                  {f.type === "file" ? fmtSize(f.size) : ""}
-                </span>
-              </div>
-            );
-          })
+          entries.map((f) => (
+            <div
+              key={f.name}
+              data-entry={f.type}
+              onClick={() => f.type === "dir" && enterDir(f.name)}
+              className={cn(
+                "group flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 text-xs transition-colors",
+                f.type === "dir"
+                  ? "cursor-pointer hover:bg-secondary/60"
+                  : "hover:bg-secondary/40"
+              )}
+            >
+              {f.type === "dir" ? (
+                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+              ) : (
+                <FileIcon className="size-3.5 shrink-0 text-muted-foreground" />
+              )}
+              <span className="truncate font-mono">{f.name}</span>
+              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">
+                {f.type === "file" ? fmtSize(f.size) : ""}
+              </span>
+            </div>
+          ))
         )}
       </div>
     </div>

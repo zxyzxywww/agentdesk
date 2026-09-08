@@ -60,8 +60,6 @@ export default function App() {
   const [tab, setTab] = useState<PanelTab>("run");
   const [toolCards, setToolCards] = useState<ToolCardData[]>([]);
   const [plan, setPlan] = useState<PlanStep[]>([]);
-  const [planRevisions, setPlanRevisions] = useState(0);
-  const planSeen = useRef(false);
   const [accept, setAccept] = useState<TaskResult | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // 文件面板刷新信号
   const [backups, setBackups] = useState<BackupRecord[]>([]);
@@ -171,8 +169,6 @@ export default function App() {
       setPending(null);
       setToolCards([]);
       setPlan([]);
-      planSeen.current = false;
-      setPlanRevisions(0);
       setAccept(null);
       try {
         const msgs = await api.sessions.messages(id);
@@ -228,17 +224,9 @@ export default function App() {
   const handleEvent = useCallback(
     (e: AgentEvent) => {
       switch (e.type) {
-        case "plan": {
-          const newPlan = (e.data.plan as PlanStep[]) ?? [];
-          setPlan(newPlan);
-          // 首次收到计划不计；之后每次 plan 事件都视为一次动态调整（update_plan）
-          if (!planSeen.current) {
-            planSeen.current = true;
-          } else {
-            setPlanRevisions((n) => n + 1);
-          }
+        case "plan":
+          setPlan((e.data.plan as PlanStep[]) ?? []);
           break;
-        }
         case "tool_start": {
           const d = e.data as { name: string; args: Record<string, unknown>; seq: number };
           setToolCards((prev) => [
@@ -310,8 +298,6 @@ export default function App() {
       setRunning(true);
       setToolCards([]);
       setPlan([]);
-      planSeen.current = false;
-      setPlanRevisions(0);
       setAccept(null);
       try {
         const res = await api.tasks.create(sid, text);
@@ -474,7 +460,6 @@ export default function App() {
             onTabChange={setTab}
             toolCards={toolCards}
             plan={plan}
-            planRevisions={planRevisions}
             refreshKey={refreshKey}
             accept={accept}
             backups={backups}
