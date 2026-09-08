@@ -252,17 +252,27 @@ def _count_files(args: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(summary=f"目录不存在: {args['directory'] or '(工作目录)'}")
     counts: dict[str, int] = {}
     total = 0
+    no_ext_files: list[str] = []  # 无扩展名文件的具体路径（防模型猜测）
     for p in base.rglob("*"):
         if p.is_file():
             total += 1
             ext = p.suffix.lower() or "(无扩展名)"
             counts[ext] = counts.get(ext, 0) + 1
+            if not p.suffix:
+                rel = rel_or_abs(p, ctx.workspace_root)
+                no_ext_files.append(rel)
     top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:15]
     top_str = "、".join(f"{ext}: {n}" for ext, n in top)
-    summary = f"共 {total} 个文件（{len(counts)} 种类型，Top15: {top_str}）"
+    hint = f"（无扩展名文件：{'、'.join(no_ext_files)}）" if no_ext_files else ""
+    summary = f"共 {total} 个文件（{len(counts)} 种类型，Top15: {top_str}）{hint}"
     return ToolResult(
         summary=summary,
-        data={"path": args["directory"] or ".", "total": total, "counts": counts},
+        data={
+            "path": args["directory"] or ".",
+            "total": total,
+            "counts": counts,
+            "no_extension_files": no_ext_files,
+        },
     )
 
 
