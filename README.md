@@ -3,7 +3,7 @@
 > 用自然语言下达任务，Agent 自主规划、调用工具完成**文件/数据处理**与**网页调研**，
 > 全程可视化监督：实时工具状态、危险操作确认、一键撤销、任务验收。
 
-面向「Agent 应用工程师」实习的**作品集项目**：一个可运行、可监督、可验收的
+面向「Agent 应用工程师」实习的**个人项目**：一个可运行、可监督、可验收的
 任务型 Agent 工作台（自研 ReAct 引擎，不依赖 Agent 框架）。
 
 ---
@@ -28,8 +28,9 @@ uv sync
 #    - DEEPSEEK_API_KEY（必填，https://platform.deepseek.com）
 #    - TAVILY_API_KEY（选填，https://app.tavily.com 免费额度；不填自动回退免 key 搜索）
 Copy-Item .env.example .env   # Windows PowerShell
+cp .env.example .env          # macOS / Linux / Git Bash
 
-# 3. 启动工作台
+# 3. 启动工作台（本地开发端口 8001）
 uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 8001
 
 # 4. 浏览器打开 http://127.0.0.1:8001
@@ -37,6 +38,14 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 
 > 没有 TAVILY_API_KEY 也能跑：`config.yaml` 里 `search.provider` 设为 `fallback`
 > 或留空 key 自动回退到 DuckDuckGo/Bing 网页解析（稳定性较弱）。
+
+### 端口说明（三种，别混）
+
+| 端口 | 场景 | 说明 |
+|---|---|---|
+| **8001** | 本地开发访问 | `uvicorn ... --port 8001`；浏览器与 `npm run dev` 开发代理都指向它（选 8001 是为避开本机常用的 8000，减少与其他本机服务的冲突） |
+| **8000** | 容器内部服务 | `Dockerfile` 里 uvicorn 监听 8000；`config.yaml` 的 `ui.port` 默认也是 8000（供直接运行脚本/容器内使用） |
+| **8001 → 8000** | Docker 宿主映射 | `docker-compose.yml` 的 `"8001:8000"`：宿主 8001 映射到容器 8000，所以 `docker compose up` 后浏览器仍访问 `http://127.0.0.1:8001` |
 
 ## 架构概览
 
@@ -53,7 +62,8 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 │ 事件：plan / tool_start / tool_end / needs_confirm / done │
 └───────────────┬───────────────────────────────────────┘
 ┌─ 工具层（agentdesk/tools，17 个工具，Pydantic 参数校验）─────┐
-│ 文件操作 6 · 表格处理 3 · 代码执行 1 · 网页调研 3              │
+│ 文件/目录 8 · 表格 3 · 代码执行 1 · 网页调研 3 ·              │
+│ 本地知识检索 1 · 规划调整 1                                   │
 └───────────────┬───────────────────────────────────────┘
 ┌─ 存储（agentdesk/storage）───────────────────────────────┐
 │ SQLite：会话/消息/任务/工具调用/备份记录  |  文件自动备份区      │
@@ -67,11 +77,14 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 | 危险操作确认 | 覆盖/删除/执行代码抛 `NeedsConfirmation`，任务挂起，用户确认/拒绝后继续 |
 | 自动备份回滚 | 修改/删除前自动备份到 `data/backups/`，界面一键恢复 |
 | 路径穿越防护 | 所有文件操作经 `resolve_in_workspace` 锁定在工作目录内 |
-| 步数上限 | 单任务最大工具调用步数（默认 20） |
+| 步数上限 | 单任务最大工具调用步数（默认 40） |
 | 成本上限 | 单任务最大成本（默认 ¥2），按模型价格表估算 |
-| 重复动作 | 连续相同调用达阈值即终止 |
+| 重复动作 | 连续相同调用达阈值即终止（默认 3 次） |
+| 反思上限 | 产出后自检（Reflection）最多 2 轮，防死循环（默认 2） |
 | 长任务中断 | UI 停止按钮 → `cancel()` |
 | 代码沙箱 | 子进程 + 工作目录限制 + 超时 + 输出截断（轻量，非强隔离，见边界） |
+
+> 以上阈值均来自 `config.yaml` 的 `agent` 段，可自行调整。
 
 ### 工具清单（17）
 
@@ -83,13 +96,15 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 ## 测试与评估
 
 ```bash
-uv run pytest          # 110 个离线测试（全 mock，不依赖付费 API）
+uv run pytest          # 111 个离线测试（全 mock，不依赖付费 API）
 uv run ruff check .    # 零告警
 uv run mypy            # 零告警
 uv run python scripts/bench_reflection.py --tasks 5   # 真实 LLM 评测（需 .env 余额）
 ```
 
-### 评测结果（真实模型实测：10 类任务 × Reflection 开关 × 3 重复 = 60 次真实执行，`deepseek-chat`）
+### 评测结果（真实模型实测：10 类任务 × Reflection 开关 × 3 重复 = 60 次真实执行）
+
+> 历史评测使用当时的官方模型别名 `deepseek-chat`（当前默认模型见 `config.yaml`，两者请求协议一致）。
 
 评测方法：任务契约化冻结（每类固定输入话术/预置文件/成功判定——只认真实产物文件与内容，不认 LLM 自述）；
 反思关 `max_reflections=0`（无返工机会）/ 开 `=2`（≤2 轮返工）；危险操作由脚本模拟用户批准并计数（HITL）；
@@ -117,7 +132,7 @@ uv run python scripts/bench_reflection.py --tasks 5   # 真实 LLM 评测（需 
 | 平均成本（元） | 0.0441 | 0.0416 |
 | 平均返工次数 | — | 0.00 |
 
-> **诚实结论（面试口径）**：60 次执行全部达标（100%），Reflection 在这批任务上返工触发 0 次——deepseek-chat
+> **诚实结论（面试口径）**：60 次执行全部达标（100%），Reflection 在这批任务上返工触发 0 次——当时的模型
 > 对确定性/多约束任务的首版质量已足够高，自检评审全部 pass，机制充当"低成本的保险丝"而非"性能助推器"：
 > 反思开与关的成本几乎持平（复杂任务上甚至略低 0.0441→0.0416，步数 7.2→6.7，n=6 样本量小、视为噪声级信号）。
 > 评测的真实价值是**诚实暴露机制的适用边界**：反思的价值需在模型会出错的开放任务中体现；同时评测过程
@@ -141,14 +156,14 @@ agentdesk/
 ├── frontend/              # Vite + React + TS + Tailwind + shadcn/ui + Motion
 │   ├── src/               # 组件与 hooks（App/TopBar/Chat/Panels/…）
 │   └── dist/              # 构建产物（.gitignore，由 FastAPI 托管）
-├── scripts/smoke.py       # 真实冒烟任务
-├── tests/                 # 110 个离线测试
-└── docs/                  # 设计文档 / 简历素材 / 录屏脚本 / 业务演示任务卡
+├── scripts/               # smoke.py（真实冒烟）· bench_reflection.py（对照评测）
+├── tests/                 # 111 个离线测试
+└── docs/                  # 设计文档 / 录屏脚本 / 业务演示任务卡
 ```
 
 ## 技术栈
 
-后端：Python 3.12 · FastAPI + WebSocket · OpenAI 兼容 API（DeepSeek）·
+后端：Python 3.12 · FastAPI + WebSocket · OpenAI 兼容 API（默认 `deepseek-v4-flash`，配置可切换）·
 Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / mypy · uv · Docker
 前端：Vite + React + TypeScript + Tailwind CSS + shadcn/ui 风格组件 + Motion 动效
 （构建产物由 FastAPI 直接托管，单服务单端口；开发模式 `npm run dev` 代理到 8001）
@@ -164,8 +179,5 @@ Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / my
 ## 参考
 
 - [docs/设计文档.md](docs/设计文档.md) —— 架构与设计决策
-- [docs/简历素材.md](docs/简历素材.md) —— 简历条目 + 面试深挖清单
 - [docs/Live-Demo-录屏脚本.md](docs/Live-Demo-录屏脚本.md) —— 演示流程
-
-# 分支练习占位
-作者：张潇漾
+- [docs/演示任务卡-业务调研报告.md](docs/演示任务卡-业务调研报告.md) —— 业务场景演示任务
