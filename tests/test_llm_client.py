@@ -46,10 +46,12 @@ def _make_client(monkeypatch: pytest.MonkeyPatch) -> LLMClient:
 def test_estimate_cost_known_model() -> None:
     # deepseek-chat: 1000 prompt * 2/1e6 + 500 completion * 3/1e6
     assert estimate_cost("deepseek-chat", 1000, 500) == pytest.approx(0.0035)
+    assert estimate_cost("deepseek-flash", 1000, 500) == pytest.approx(0.002)
 
 
 def test_estimate_cost_unknown_model_uses_default() -> None:
-    assert estimate_cost("some-new-model", 1000, 500) == pytest.approx(0.0035)
+    # 默认价已变为 (1.0, 2.0)
+    assert estimate_cost("some-new-model", 1000, 500) == pytest.approx(0.002)
 
 
 def test_chat_returns_content_and_updates_stats(monkeypatch: pytest.MonkeyPatch) -> None:
