@@ -163,7 +163,7 @@ agentdesk/
 
 ## 技术栈
 
-后端：Python 3.12 · FastAPI + WebSocket · OpenAI 兼容 API（默认 `deepseek-v4-flash`，配置可切换）·
+后端：Python 3.12 · FastAPI + WebSocket · OpenAI 兼容 API（默认 `deepseek-flash`，配置可切换）·
 Tavily / DuckDuckGo 搜索 · pandas · SQLite · Pydantic · pytest / ruff / mypy · uv · Docker
 前端：Vite + React + TypeScript + Tailwind CSS + shadcn/ui 风格组件 + Motion 动效
 （构建产物由 FastAPI 直接托管，单服务单端口；开发模式 `npm run dev` 代理到 8001）

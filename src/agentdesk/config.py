@@ -19,12 +19,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class ModelConfig(BaseModel):
     base_url: str = (
-        "https://ark.cn-beijing.volces.com/api/v3"  # 火山方舟（切回官方见 config.yaml 注释）
+        "https://api.deepseek.com"  # DeepSeek 官方（切换方式见 config.yaml 注释）
     )
-    chat_model: str = "deepseek-v4-flash-ga-260731"
+    chat_model: str = "deepseek-flash"
     temperature: float = 0.2
     max_tokens: int = 4096
-    api_key_env: str = "ARK_API_KEY"  # 从环境变量读取 API key
+    api_key_env: str = "DEEPSEEK_API_KEY"  # 从环境变量读取 API key
 
 
 class AgentConfig(BaseModel):

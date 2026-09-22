@@ -23,7 +23,7 @@ uv run uvicorn agentdesk.ui.main:create_app --factory --host 127.0.0.1 --port 80
 - 打开 `http://127.0.0.1:8001`，深色工作台
 - 口播：**「这是 AgentDesk，一个通用任务型 Agent 工作台。它能把自然语言任务拆成计划，
   调用工具完成文件与数据处理，还能做网页调研；整个过程每一步都看得见、可干预。」**
-- 镜头停留顶部栏：模型（deepseek-chat）、工作目录、累计成本。
+- 镜头停留顶部栏：模型（deepseek-flash）、工作目录、累计成本。
 
 ## 2. 任务一：合并 CSV（约 50 秒）——展示核心工具链
 
